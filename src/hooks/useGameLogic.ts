@@ -1284,11 +1284,11 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   }, [gameState.currentPlayer, gameState.players, addGameEvent, setGameState]);
 
   // Compute jail fine amount for display
-  const getJailFineAmount = useCallback((): { fine: number; income: number } => {
+  const getJailFineAmount = useCallback((): { fine: number; income: number; numProperties: number } => {
     const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
-    if (!cp) return { fine: 0, income: 0 };
-    const { income } = computePlayerIncome(gameState.properties, cp.name);
-    return { fine: Math.round(income * 0.20), income };
+    if (!cp) return { fine: 0, income: 0, numProperties: 0 };
+    const { income, numProperties } = computePlayerIncome(gameState.properties, cp.name);
+    return { fine: Math.round(income * 0.20), income, numProperties };
   }, [gameState.currentPlayer, gameState.players, gameState.properties]);
 
   // Resolve pending card — always advances the turn regardless of card outcome
@@ -1445,7 +1445,9 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     // Worker functions
     assignWorker,
     removeWorker,
-    updateWorkerColor
+    updateWorkerColor,
+    // Build eligibility check
+    canBuildHouse
   };
 };
 

@@ -4,8 +4,6 @@ import MonopolyBoardLayout from './MonopolyBoardLayout';
 import CentralDisplay from './CentralDisplay';
 import AuctionPanel from './AuctionPanel';
 import PlayerPanel from './PlayerPanel';
-import DiceRoller from './DiceRoller';
-import GameOverview from './GameOverview';
 import PropertyCard from './PropertyCard';
 import SpecialPropertyInfo from './SpecialPropertyInfo';
 import RulesPanel from './RulesPanel';
@@ -110,7 +108,8 @@ const MonopolyGame: React.FC = () => {
     resolveCard,
     assignWorker,
     removeWorker,
-    updateWorkerColor
+    updateWorkerColor,
+    canBuildHouse
   } = useGameLogic(!showLobby ? lobbyCode : undefined, localPlayerId);
 
   const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
@@ -481,7 +480,7 @@ const MonopolyGame: React.FC = () => {
 
   // Jail dialog: show when it's my turn, I'm in jail, waiting to roll
   const showJailDialog = isMyTurn && myPlayer.isInJail && gameState.turnState === 'waiting_for_roll' && gameState.gamePhase === 'playing';
-  const { fine: jailFine, income: jailIncome } = showJailDialog ? getJailFineAmount() : { fine: 0, income: 0 };
+  const { fine: jailFine, income: jailIncome, numProperties: jailNumProperties } = showJailDialog ? getJailFineAmount() : { fine: 0, income: 0, numProperties: 0 };
 
   // Pending card dialog — also suppressed locally once resolved (Firestore update is async)
   const myPendingCard = gameState.pendingCard && gameState.currentPlayer === localPlayerId && !cardResolved
@@ -493,6 +492,8 @@ const MonopolyGame: React.FC = () => {
   const ownedPropertyOnTile = (
     isMyTurn &&
     gameState.turnState !== 'waiting_for_roll' &&
+    gameState.turnState !== 'completed' &&
+    !gameState.pendingRent &&
     !offerDismissed &&
     gameState.settings.auctionsEnabled &&
     propertyOnMyTile &&
@@ -547,11 +548,6 @@ const MonopolyGame: React.FC = () => {
   const handleTradeOffer = (toPlayer: string, offeredProps: string[], requestedProps: string[]) => {
     // Implementation for trading properties
     console.log('Trade offer:', { toPlayer, offeredProps, requestedProps });
-  };
-
-  const handleEndGame = () => {
-    // Implementation for ending the game
-    console.log('Game ended');
   };
 
   const handleCreateLobby = async (settings: GameSettings, code: string, playerName: string, color?: string, icon?: string) => {
@@ -884,7 +880,7 @@ const MonopolyGame: React.FC = () => {
             tradingEnabled={gameState.settings.tradingEnabled}
             onTradeClick={() => setIsTradingOpen(true)}
             isMyTurn={isMyTurn}
-            turnTimer={turnTimer}
+            turnTimer={isMyTurn ? turnTimer : null}
             turnTimerDuration={gameState.settings.turnTimerDuration}
           >
             {(showJailDialog || myPendingCard || myPendingRentData || currentAuctionData || pendingPurchaseData || ownedPropertyOnTile || landedOnOwnProperty) ? (
@@ -901,7 +897,8 @@ const MonopolyGame: React.FC = () => {
                       </div>
                       {jailFine > 0 ? (
                         <div className="bg-rose-950/40 rounded-lg p-3 border border-rose-800/50 text-sm space-y-1">
-                          <p className="text-slate-300">Property income: <span className="text-white font-bold">${jailIncome.toLocaleString('en-US')}</span></p>
+                          <p className="text-slate-300">Income properties: <span className="text-white font-bold">{jailNumProperties}</span></p>
+                          <p className="text-slate-300">Total rental income: <span className="text-white font-bold">${jailIncome.toLocaleString('en-US')}</span></p>
                           <p className="text-slate-300">Bail fine (20%): <span className="text-rose-300 font-bold">${jailFine.toLocaleString('en-US')}</span></p>
                           <p className="text-xs text-slate-500">Pay now to roll and move freely this turn.</p>
                         </div>
@@ -981,16 +978,22 @@ const MonopolyGame: React.FC = () => {
                       <div className="flex gap-3">
                         {propertyOnMyTile && propertyOnMyTile.type === 'property' && !propertyOnMyTile.hasHotel && (
                           propertyOnMyTile.houses < 4 ? (
-                            <button
-                              onClick={() => { buildHouse(propertyOnMyTile.id); endTurn(); }}
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors disabled:opacity-40"
-                            >
-                              Build House 🏠
-                            </button>
+                            canBuildHouse(propertyOnMyTile, myPlayer.name) ? (
+                              <button
+                                onClick={() => { buildHouse(propertyOnMyTile.id); endTurn(); }}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
+                              >
+                                Build House 🏠
+                              </button>
+                            ) : (
+                              <p className="flex-1 text-xs text-amber-400 text-center self-center">
+                                Need full color group to build
+                              </p>
+                            )
                           ) : (
                             <button
                               onClick={() => { buildHotel(propertyOnMyTile.id); endTurn(); }}
-                              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors disabled:opacity-40"
+                              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
                             >
                               Build Hotel 🏨
                             </button>

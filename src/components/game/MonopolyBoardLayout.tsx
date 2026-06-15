@@ -348,20 +348,20 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
               ))}
             </div>
           )}
-
-          {/* Ownership / auction dot */}
-          {(property.isOwned || property.isInAuction) && (
-            <div className="absolute top-0 right-0 p-0.5 z-10 flex gap-0.5">
-              {property.isOwned && (
-                <div
-                  className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shadow-sm border border-black/20"
-                  style={{ backgroundColor: players.find(p => p.name === property.owner)?.color || '#999' }}
-                />
-              )}
-              {property.isInAuction && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-pulse" />}
-            </div>
-          )}
         </div>
+
+        {/* Ownership / auction dot — direct child of Card (relative) so padding changes don't affect its size */}
+        {isDiscovered && (property.isOwned || property.isInAuction) && (
+          <div className="absolute top-0.5 right-0.5 z-[15] flex gap-0.5 pointer-events-none">
+            {property.isOwned && (
+              <div
+                className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-white/50 shadow-md flex-shrink-0"
+                style={{ backgroundColor: players.find(p => p.name === property.owner)?.color || '#999' }}
+              />
+            )}
+            {property.isInAuction && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-yellow-400 rounded-full animate-pulse flex-shrink-0" />}
+          </div>
+        )}
       </Card>
     );
   };

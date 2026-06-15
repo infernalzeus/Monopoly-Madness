@@ -37,6 +37,7 @@ export const advanceTurn = (state: GameState): GameState => {
     turnState: 'waiting_for_roll',
     lastDiceRoll: null,
     pendingPurchase: null,
+    pendingRent: null,
     pendingCard: null
   };
 
@@ -46,7 +47,8 @@ export const advanceTurn = (state: GameState): GameState => {
 // Compute a player's total income from all owned properties (used for jail fine and card amounts)
 export const computePlayerIncome = (properties: Property[], playerName: string): { income: number; numProperties: number } => {
   const ownedProps = properties.filter(p => p.owner === playerName && !p.isMortgaged);
-  const numProperties = ownedProps.length;
+  // Count only properties that actually generate income (utilities don't contribute)
+  const numProperties = ownedProps.filter(p => p.type === 'property' || p.type === 'railroad').length;
   let income = 0;
   ownedProps.forEach(prop => {
     if (prop.type === 'property') {
