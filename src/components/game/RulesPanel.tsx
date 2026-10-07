@@ -44,7 +44,7 @@ const RulesPanel: React.FC<RulesPanelProps> = ({ settings, onClose }) => {
 
           <Section title="Basic Movement" emoji="🎲">
             <Rule>Roll two dice on your turn and move that many spaces around the board.</Rule>
-            <Rule>The board has 40 spaces — when you pass or land on GO, collect <strong className="text-yellow-300">10% of your current cash</strong> (minimum $2,00,000).</Rule>
+            <Rule>The board has 40 spaces — when you pass or land on GO, collect <strong className="text-yellow-300">10% of your current cash</strong> (minimum ${settings.passGoReward.toLocaleString('en-US')}).</Rule>
             <Rule>If you roll doubles, you may roll again after your turn resolves. Three consecutive doubles sends you to Jail.</Rule>
             <Rule>Landing on Chance or Community Chest <strong className="text-yellow-300">on a double</strong> also earns a Get Out of Jail Free card (use it from the Jail dialog).</Rule>
           </Section>

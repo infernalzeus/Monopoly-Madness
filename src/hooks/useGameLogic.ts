@@ -4,7 +4,7 @@ import { doc, onSnapshot, runTransaction, setDoc, getDoc } from 'firebase/firest
 import {
   rollDiceLogic, handlePropertyPurchase, advanceTurn as advanceTurnLogic, computePlayerIncome,
   applyPayment, addEvent, resolvePendingCard, canBuildHouseOn, canBuildHotelOn, canSellBuildingOn, hasBuildingsInGroup,
-  mortgagePayout, unmortgageCost
+  mortgagePayout, unmortgageCost, checkWinCondition
 } from '../gameEngine/core';
 
 // Advance turn AND always reset turnEndTime so the new player's timer is always fresh.
@@ -234,6 +234,10 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     };
   }, [roomId]);
 
+  // Latest local copy, read through a ref so setGameState keeps a stable identity
+  const stateRef = useRef<GameState | null>(null);
+  stateRef.current = gameStateInternal;
+
   const setGameState = useCallback((updater: any) => {
     if (!roomId) {
       setGameStateInternal(prev => {
@@ -247,28 +251,32 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       const snap = await transaction.get(roomRef);
       if (!snap.exists()) {
         // Just created, doc not ready, write it here manually:
-        const currentState = gameStateInternal || getInitialState();
+        const currentState = stateRef.current || getInitialState();
         let nextState = typeof updater === 'function' ? updater(currentState) : updater;
         transaction.set(roomRef, { gameState: nextState, status: 'waiting' });
         return;
       }
       const currentState = snap.data().gameState;
       let nextState = typeof updater === 'function' ? updater(currentState) : updater;
-      
+      // An updater that returns its input made no change — don't write (every client races to resolve
+      // auctions/turns, so most of those calls are expected no-ops)
+      if (nextState === currentState) return;
+
       const updateData: any = { 
         gameState: nextState,
         lastUpdated: Date.now(),
         playerCount: nextState.players.length
       };
 
-      // Also update top-level status if game ended
-      if (nextState.gamePhase === 'ended') {
-        updateData.status = 'ended';
-      }
+      // Keep the lobby-visible status in step with the phase
+      updateData.status = nextState.gamePhase === 'ended' ? 'ended' : nextState.gamePhase === 'setup' ? 'waiting' : 'playing';
 
       transaction.update(roomRef, updateData);
-    }).catch(console.error);
-  }, [roomId, gameStateInternal]);
+    }).catch((e: any) => {
+      console.error(e);
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mma:write-error', { detail: e?.code || String(e) }));
+    });
+  }, [roomId]);
   
   // Provide a fallback initial state for immediate render
   const gameState = gameStateInternal || getInitialState();
@@ -305,15 +313,18 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     const isDouble = dice1 === dice2;
     
     return { dice1, dice2, total, isDouble };
-  }, []);
+  }, [setGameState]);
 
   // Advance the turn inside one transaction. `expectTurn` makes the call idempotent: if another client
   // (timer, auto-advance, bot, End Turn button) already advanced, the stale caller is a no-op.
   // Never advances mid-auction (the auction's own end advances) or outside the 'playing' phase.
-  const advanceTurn = useCallback((expectTurn?: number) => {
+  const advanceTurn = useCallback((expectTurn?: number, expectEnd?: number | null) => {
     setGameState((prev: GameState) => {
       if (prev.gamePhase !== 'playing' || prev.currentAuction) return prev;
       if (typeof expectTurn === 'number' && prev.turn !== expectTurn) return prev;
+      // A roll refreshes the deadline without changing the turn, so a timer expiry submitted for the OLD
+      // deadline must not end the freshly-rolled turn
+      if (expectEnd !== undefined && (prev.turnEndTime ?? null) !== expectEnd) return prev;
       return withFreshTimer(prev);
     });
   }, [setGameState]);
@@ -344,9 +355,17 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   const startAuction = useCallback((propertyId: string, startedByName?: string, customStartingBid?: number) => {
     setGameState((prev: GameState) => {
       if (prev.currentAuction || !prev.settings.auctionsEnabled) return prev;
+      // A turn auction must come from the live purchase offer, started by the player it was made to
+      if (!prev.preAuctionPhase) {
+        const pp = prev.pendingPurchase;
+        if (prev.gamePhase !== 'playing' || !pp || pp.propertyId !== propertyId) return prev;
+        const starter = prev.players.find(p => p.id === pp.playerId);
+        if (!starter || (localPlayerId && !starter.isBot && starter.id !== localPlayerId)) return prev;
+      }
+      if (customStartingBid !== undefined && !(Number.isFinite(customStartingBid) && customStartingBid > 0)) return prev;
       const property = prev.properties.find(p => p.id === propertyId);
       if (!property || property.isOwned || property.isInAuction || property.isInactive || property.type === 'special') return prev;
-      const auction = makeAuction(property, prev.settings.auctionDuration, startedByName, customStartingBid);
+      const auction = makeAuction(property, prev.settings.auctionDuration, startedByName, customStartingBid === undefined ? undefined : Math.round(customStartingBid));
       return {
         ...prev,
         currentAuction: auction,
@@ -355,7 +374,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         properties: prev.properties.map(p => p.id === propertyId ? { ...p, isInAuction: true } : p)
       };
     });
-  }, [setGameState]);
+  }, [setGameState, localPlayerId]);
 
   // ── Pre-game draft: auctions the host's preAuctionProperties one by one, then starts play ──
   // Idempotent: a no-op unless we are in the draft with no live auction.
@@ -395,14 +414,16 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     setGameState((prev: GameState) => nextDraftStep(prev));
   }, [setGameState]);
 
-  // Only the first human in the room drives the draft so clients don't all fire at once
-  // (the transaction guard makes a race harmless anyway).
-  const isDraftHost = !!localPlayerId && gameState.players.find(p => !p.isBot && !p.isSpectator)?.id === localPlayerId;
+  // Every active human may drive the draft (the transition is idempotent) — staggered by rank so the
+  // first human normally does it and the others only step in if that client has disconnected.
+  const humanRank = localPlayerId
+    ? gameState.players.filter(p => !p.isBot && !p.isSpectator && p.isActive).findIndex(p => p.id === localPlayerId)
+    : -1;
   useEffect(() => {
-    if (!isDraftHost || !gameState.preAuctionPhase || gameState.currentAuction || gameState.gamePhase === 'ended') return;
-    const t = setTimeout(() => advanceDraft(), 800);
+    if (humanRank < 0 || !gameState.preAuctionPhase || gameState.currentAuction || gameState.gamePhase === 'ended') return;
+    const t = setTimeout(() => advanceDraft(), 800 + humanRank * 2500);
     return () => clearTimeout(t);
-  }, [isDraftHost, gameState.preAuctionPhase, gameState.currentAuction, gameState.gamePhase, advanceDraft]);
+  }, [humanRank, gameState.preAuctionPhase, gameState.currentAuction, gameState.gamePhase, advanceDraft]);
 
   // Handle dice roll and player movement
   const handleDiceRoll = useCallback(() => {
@@ -463,10 +484,16 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   
   // Resolve the live auction in ONE transaction. `force` is only for the seller's "Collect" button;
   // timer-driven calls are ignored until the auction has really expired (guards stale-timer double-ends).
-  const resolveAuction = useCallback((force: boolean) => {
+  const resolveAuction = useCallback((force: boolean, expectStart?: number) => {
     setGameState((prev: GameState) => {
       const a = prev.currentAuction;
       if (!a) return prev; // someone else already resolved it
+      if (expectStart !== undefined && a.startTime !== expectStart) return prev; // a different (newer) auction
+      if (force) {
+        // Only the player who opened the auction may close it early
+        const me = prev.players.find(p => p.id === localPlayerId);
+        if (!a.startedBy || !me || me.name !== a.startedBy) return prev;
+      }
       if (!force && Date.now() < a.endTimestamp - 1500) return prev;
       const property = prev.properties.find(p => p.id === a.propertyId);
       const bidder = a.highestBidder ? prev.players.find(p => p.name === a.highestBidder) : undefined;
@@ -495,10 +522,11 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       if (prev.preAuctionPhase) return next;
       return withFreshTimer(next);
     });
-  }, [setGameState]);
+  }, [setGameState, localPlayerId]);
 
   const endAuction = useCallback(() => resolveAuction(false), [resolveAuction]);
-  const endAuctionNow = useCallback(() => resolveAuction(true), [resolveAuction]);
+  const auctionStart = gameState.currentAuction?.startTime;
+  const endAuctionNow = useCallback(() => resolveAuction(true, auctionStart), [resolveAuction, auctionStart]);
   const resolveAuctionRef = useRef(resolveAuction);
   useEffect(() => { resolveAuctionRef.current = resolveAuction; }, [resolveAuction]);
 
@@ -510,7 +538,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     const tick = () => {
       const ms = a.endTimestamp - Date.now();
       setAuctionTimer(Math.max(0, Math.ceil(ms / 1000)));
-      if (ms <= 0) resolveAuctionRef.current(false);
+      if (ms <= 0) resolveAuctionRef.current(false, a.startTime);
     };
     tick();
     const interval = setInterval(tick, 1000);
@@ -534,7 +562,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         const ms = endAt - Date.now();
         setTurnTimer(Math.max(0, Math.floor(ms / 1000)));
         if (ms <= 0 && (gameState.currentPlayer === localPlayerId || ms < -5000)) {
-          advanceTurnRef.current(turnAtStart);
+          advanceTurnRef.current(turnAtStart, endAt);
         }
       };
       tick();
@@ -560,14 +588,19 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState.turnState, gameState.gamePhase, gameState.currentPlayer, gameState.turn, !!gameState.currentAuction, localPlayerId]);
 
+  const expectStart = gameState.currentAuction?.startTime;
   const placeBid = useCallback((amount: number, bidderId?: string) => {
     const biddingPlayerId = bidderId || localPlayerId || gameState.currentPlayer;
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    amount = Math.round(amount);
     setGameState((prev: GameState) => {
       const a = prev.currentAuction;
       if (!a) return prev;
+      if (expectStart !== undefined && a.startTime !== expectStart) return prev; // intended for an earlier auction
       const bidder = prev.players.find(p => p.id === biddingPlayerId);
       if (!bidder || !bidder.isActive || bidder.isSpectator || bidder.balance < amount) return prev;
       if (a.highestBidder === bidder.name) return prev;                       // already winning
+      if (a.startedBy && bidder.name === a.startedBy) return prev;            // the seller can't bid on their own auction
       if (Date.now() > a.endTimestamp + 1000) return prev;                    // bidding closed
       if (a.highestBidder ? amount <= a.currentBid : amount < a.currentBid) return prev; // lost a bid race / too low
 
@@ -580,11 +613,11 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
           currentBid: amount,
           highestBidder: bidder.name,
           endTimestamp: now + Math.max(a.endTimestamp - now, 15000), // a late bid extends the clock to >= 15 s
-          bids: [...a.bids, bid]
+          bids: [...a.bids, bid].slice(-30) // keep the room document small
         }
       };
     });
-  }, [setGameState, localPlayerId, gameState.currentPlayer]);
+  }, [setGameState, localPlayerId, gameState.currentPlayer, expectStart]);
 
   const purchaseProperty = useCallback((propertyId: string) => {
     setGameState((prev: GameState) => {
@@ -632,27 +665,14 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     // Turn advancement is handled by the auto-advance useEffect (human) or bot useEffect (bot)
   }, [setGameState]);
 
-  // Make a simple purchase offer to another player for a specific property
-  const makeOffer = useCallback((propertyId: string, toPlayerName: string, amount: number) => {
-    const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-    const property = gameState.properties.find(p => p.id === propertyId);
-    if (!currentPlayer || !property) return;
-
-    addGameEvent(
-      'trade',
-      currentPlayer.name,
-      `offered $${amount.toLocaleString('en-US')} to ${toPlayerName} for ${property.name}`,
-      amount
-    );
-  }, [gameState.players, gameState.currentPlayer, gameState.properties, addGameEvent]);
-
   // ── Mortgage & building actions ────────────────────────────────────────────────
   // All validate against the LIVE transaction state (not the client's possibly stale copy) and act
   // only for the player whose turn it is.
   const withActor = (fn: (prev: GameState, actor: Player) => GameState) => (prev: GameState): GameState => {
     if (prev.gamePhase !== 'playing') return prev;
     const actor = prev.players.find(p => p.id === prev.currentPlayer);
-    if (!actor || !actor.isActive || (localPlayerId && prev.currentPlayer !== localPlayerId)) return prev;
+    // The bot's turn is driven by a human client; otherwise only the player whose turn it is may act
+    if (!actor || !actor.isActive || (localPlayerId && prev.currentPlayer !== localPlayerId && !actor.isBot)) return prev;
     return fn(prev, actor);
   };
 
@@ -766,7 +786,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       const parsed: GameState = JSON.parse(s);
       setGameState(parsed);
     } catch {}
-  }, []);
+  }, [setGameState]);
 
   const resetGameToInitial = useCallback(() => {
     setGameState({
@@ -791,59 +811,48 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       pendingCard: null,
       workers: []
     });
-  }, []);
+  }, [setGameState]);
+
+  // One membership per player: moving to a team removes you from the old one, and empty teams disappear.
+  // Win is re-evaluated because a membership change can leave every survivor on one team.
+  const moveToTeam = (prev: GameState, playerId: string, teamId: string, newTeam?: Team): GameState => {
+    const base = newTeam ? [...prev.teams, newTeam] : prev.teams;
+    if (!base.some(t => t.id === teamId)) return prev;
+    const teams = base
+      .map(t => t.id === teamId
+        ? { ...t, members: t.members.includes(playerId) ? t.members : [...t.members, playerId] }
+        : { ...t, members: t.members.filter(m => m !== playerId) })
+      .filter(t => t.members.length > 0);
+    const players = prev.players.map(p => p.id === playerId ? { ...p, teamId } : p);
+    return checkWinCondition({ ...prev, teams, players });
+  };
 
   const createTeam = useCallback((teamName: string) => {
-    const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-    if (!currentPlayer) return;
-
-    const newTeamId = `team-${Date.now()}`;
-    const newTeam: Team = {
-      id: newTeamId,
-      name: teamName,
-      members: [currentPlayer.id],
-      sharedBalance: 0,
-      color: currentPlayer.color
-    };
-
-    setGameState(prev => ({
-      ...prev,
-      teams: [...prev.teams, newTeam],
-      players: prev.players.map(p =>
-        p.id === currentPlayer.id ? { ...p, teamId: newTeamId } : p
-      )
-    }));
-  }, [gameState.currentPlayer, gameState.players, setGameState]);
+    const name = (teamName || '').trim().slice(0, 24);
+    if (!name) return;
+    setGameState((prev: GameState) => {
+      const me = prev.players.find(p => p.id === (localPlayerId || prev.currentPlayer));
+      if (!me || !me.isActive || !prev.settings.teamsEnabled) return prev;
+      const newTeamId = `team-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+      const newTeam: Team = { id: newTeamId, name, members: [me.id], sharedBalance: 0, color: me.color };
+      return moveToTeam(prev, me.id, newTeamId, newTeam);
+    });
+  }, [setGameState, localPlayerId]);
 
   const joinTeam = useCallback((teamId: string) => {
-    const joinerId = localPlayerId || gameState.currentPlayer;
-    const cp = gameState.players.find(p => p.id === joinerId);
-    if (!cp) return;
-
-    setGameState(prev => {
-      const team = prev.teams.find(t => t.id === teamId);
-      if (!team) return prev;
-
-      // Keep both players fully active — just update team membership
-      const newTeams = prev.teams.map(t =>
-        t.id === teamId && !t.members.includes(cp.id)
-          ? { ...t, members: [...t.members, cp.id] }
-          : t
-      );
-      // Update each player's teamId field
-      const newPlayers = prev.players.map(p =>
-        p.id === cp.id ? { ...p, teamId } : p
-      );
-      return { ...prev, teams: newTeams, players: newPlayers };
+    setGameState((prev: GameState) => {
+      const me = prev.players.find(p => p.id === (localPlayerId || prev.currentPlayer));
+      if (!me || !me.isActive || !prev.settings.teamsEnabled || me.teamId === teamId) return prev;
+      return moveToTeam(prev, me.id, teamId);
     });
-  }, [localPlayerId, gameState.currentPlayer, gameState.players, setGameState]);
+  }, [setGameState, localPlayerId]);
 
   const updateSettings = useCallback((newSettings: Partial<GameSettings>) => {
     setGameState(prev => ({
       ...prev,
       settings: { ...prev.settings, ...newSettings }
     }));
-  }, []);
+  }, [setGameState]);
 
   // Game mode management
   const setGameMode = useCallback((mode: GameMode) => {
@@ -886,7 +895,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       ...prev,
       consoleOpen: !prev.consoleOpen
     }));
-  }, []);
+  }, [setGameState]);
 
   const updatePropertyList = useCallback((listName: string, propertyIds: string[]) => {
     setGameState(prev => ({
@@ -899,7 +908,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         }
       }
     }));
-  }, []);
+  }, [setGameState]);
 
   const addPropertyToList = useCallback((listName: string, propertyId: string) => {
     setGameState(prev => {
@@ -917,7 +926,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         }
       };
     });
-  }, []);
+  }, [setGameState]);
 
   const removePropertyFromList = useCallback((listName: string, propertyId: string) => {
     setGameState(prev => ({
@@ -930,7 +939,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         }
       }
     }));
-  }, []);
+  }, [setGameState]);
 
   const setPreAuctionProperties = useCallback((propertyIds: string[]) => {
     setGameState(prev => ({
@@ -940,7 +949,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         preAuctionProperties: propertyIds
       }
     }));
-  }, []);
+  }, [setGameState]);
 
   // Property editing
   const updateProperty = useCallback((propertyId: string, updates: Partial<Property>) => {
@@ -985,8 +994,10 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
       };
       // Keep the doc small: drop old resolved offers, keep every pending one
-      const kept = prev.tradeOffers.filter(o => o.status === 'pending').concat(
-        prev.tradeOffers.filter(o => o.status !== 'pending').slice(-10)
+      const now = Date.now();
+      const live = prev.tradeOffers.map(o => o.status === 'pending' && now > o.expiresAt ? { ...o, status: 'rejected' as const } : o);
+      const kept = live.filter(o => o.status === 'pending').concat(
+        live.filter(o => o.status !== 'pending').slice(-10)
       );
       return addEvent({ ...prev, tradeOffers: [...kept, tradeOffer] }, 'trade', from.name,
         `offered trade to ${toPlayer}`, offeredCash - requestedCash);
@@ -1006,7 +1017,9 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
 
       if (Date.now() > offer.expiresAt) return cancel('offer expired');
       const from = prev.players.find(p => p.name === offer.fromPlayer);
-      const acceptor = prev.players.find(p => p.name === (acceptorName || offer.toPlayer));
+      // Only the player the offer was made to can accept it (the bot's reply is driven by a human client)
+      const acceptor = prev.players.find(p => p.name === offer.toPlayer);
+      if (acceptor && !acceptor.isBot && localPlayerId && acceptor.id !== localPlayerId) return prev;
       if (!from || !acceptor || !from.isActive || !acceptor.isActive || from.id === acceptor.id) return cancel('a player is no longer available');
 
       const owns = (ids: string[], name: string) => ids.every(id => {
@@ -1052,20 +1065,24 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   }, [setGameState]);
 
   const rejectTradeOffer = useCallback((offerId: string) => {
-    setGameState(prev => ({
-      ...prev,
-      tradeOffers: prev.tradeOffers.map(o =>
-        o.id === offerId ? { ...o, status: 'rejected' as const } : o
-      )
-    }));
-  }, []);
+    setGameState((prev: GameState) => {
+      const o = prev.tradeOffers.find(x => x.id === offerId);
+      if (!o || o.status !== 'pending') return prev;
+      const to = prev.players.find(p => p.name === o.toPlayer);
+      if (to && !to.isBot && localPlayerId && to.id !== localPlayerId) return prev; // only the recipient declines
+      return { ...prev, tradeOffers: prev.tradeOffers.map(x => x.id === offerId ? { ...x, status: 'rejected' as const } : x) };
+    });
+  }, [setGameState, localPlayerId]);
 
   const cancelTradeOffer = useCallback((offerId: string) => {
-    setGameState(prev => ({
-      ...prev,
-      tradeOffers: prev.tradeOffers.filter(o => o.id !== offerId)
-    }));
-  }, []);
+    setGameState((prev: GameState) => {
+      const o = prev.tradeOffers.find(x => x.id === offerId);
+      if (!o) return prev;
+      const from = prev.players.find(p => p.name === o.fromPlayer);
+      if (from && localPlayerId && from.id !== localPlayerId) return prev; // only the sender withdraws
+      return { ...prev, tradeOffers: prev.tradeOffers.filter(x => x.id !== offerId) };
+    });
+  }, [setGameState, localPlayerId]);
 
   // Rent payment. Goes through the engine's applyPayment so an unaffordable rent bankrupts the payer
   // (previously the balance just went negative and the player stayed in the game).
@@ -1090,51 +1107,49 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   // Rent can never be skipped (the dialog disables the button); kept so the prop contract holds.
   const skipRent = payRent;
 
-  // Jail: pay 20% of property income to leave; if they can't afford or skip, decrement jailTurns
+  // Jail actions compute everything inside the live updater and require the same turn the click was made on,
+  // so a double-click or a late timeout can't charge twice or touch the next player.
   const payJailFine = useCallback(() => {
-    const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
-    if (!cp || !cp.isInJail) return;
-    const { income } = computePlayerIncome(gameState.properties, cp.name);
-    const fine = Math.round(income * 0.20);
-    if (fine <= 0 || cp.balance < fine) return;
-    setGameState(prev => ({
-      ...prev,
-      players: prev.players.map(p =>
-        p.id === prev.currentPlayer
-          ? { ...p, balance: p.balance - fine, isInJail: false, jailTurns: 0 }
-          : p
-      )
+    const turnAtCall = gameState.turn;
+    setGameState(withActor((prev, actor) => {
+      if (prev.turn !== turnAtCall || !actor.isInJail || prev.turnState !== 'waiting_for_roll') return prev;
+      const { income } = computePlayerIncome(prev.properties, actor.name);
+      const fine = Math.round(income * 0.20);
+      if (fine <= 0 || actor.balance < fine) return prev;
+      const next = {
+        ...prev,
+        players: prev.players.map(p => p.id === actor.id ? { ...p, balance: p.balance - fine, isInJail: false, jailTurns: 0 } : p)
+      };
+      return addEvent(next, 'jail', actor.name, `paid $${fine.toLocaleString('en-US')} jail fine (20% of $${income.toLocaleString('en-US')} property income)`, -fine);
     }));
-    addGameEvent('jail', cp.name, `paid $${fine.toLocaleString('en-US')} jail fine (20% of $${income.toLocaleString('en-US')} property income)`, -fine);
-  }, [gameState.players, gameState.currentPlayer, gameState.properties, addGameEvent, setGameState]);
+  }, [setGameState, localPlayerId, gameState.turn]);
 
   // Spend a Get Out of Jail Free card: free release, you still roll this turn
   const spendJailCard = useCallback(() => {
+    const turnAtCall = gameState.turn;
     setGameState(withActor((prev, actor) => {
-      if (!actor.isInJail || (actor.jailCards || 0) <= 0 || prev.turnState !== 'waiting_for_roll') return prev;
+      if (prev.turn !== turnAtCall || !actor.isInJail || (actor.jailCards || 0) <= 0 || prev.turnState !== 'waiting_for_roll') return prev;
       const next = {
         ...prev,
         players: prev.players.map(p => p.id === actor.id ? { ...p, jailCards: (p.jailCards || 0) - 1, isInJail: false, jailTurns: 0 } : p)
       };
       return addEvent(next, 'jail', actor.name, 'used a Get Out of Jail Free card');
     }));
-  }, [setGameState, localPlayerId]);
+  }, [setGameState, localPlayerId, gameState.turn]);
 
   const skipJailTurn = useCallback(() => {
-    const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
-    if (!cp || !cp.isInJail) return;
-    const remaining = Math.max(0, (cp.jailTurns || 0) - 1);
-    setGameState(prev => ({
-      ...prev,
-      players: prev.players.map(p =>
-        p.id === prev.currentPlayer
-          ? { ...p, jailTurns: remaining, isInJail: remaining > 0 }
-          : p
-      ),
-      turnState: 'completed' as const
+    const turnAtCall = gameState.turn;
+    setGameState(withActor((prev, actor) => {
+      if (prev.turn !== turnAtCall || !actor.isInJail || prev.turnState !== 'waiting_for_roll') return prev;
+      const remaining = Math.max(0, (actor.jailTurns || 0) - 1);
+      const next: GameState = {
+        ...prev,
+        players: prev.players.map(p => p.id === actor.id ? { ...p, jailTurns: remaining, isInJail: remaining > 0 } : p),
+        turnState: 'completed' as const
+      };
+      return addEvent(next, 'jail', actor.name, remaining > 0 ? `stayed in jail (${remaining} turns left)` : 'released from jail (served time)');
     }));
-    addGameEvent('jail', cp.name, remaining > 0 ? `stayed in jail (${remaining} turns left)` : 'released from jail (served time)');
-  }, [gameState.currentPlayer, gameState.players, addGameEvent, setGameState]);
+  }, [setGameState, localPlayerId, gameState.turn]);
 
   // Compute jail fine amount for display
   const getJailFineAmount = useCallback((): { fine: number; income: number; numProperties: number } => {
@@ -1144,49 +1159,50 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     return { fine: Math.round(income * 0.20), income, numProperties };
   }, [gameState.currentPlayer, gameState.players, gameState.properties]);
 
-  // Resolve pending card — always advances the turn regardless of card outcome
+  // Resolve pending card — only ever acts on a card that is still pending for the turn the click was made on
   const resolveCard = useCallback(() => {
+    const turnAtCall = gameState.turn;
     setGameState((prev: GameState) => {
-      // Fallback: if pendingCard is gone (race condition) but we're still blocked, unblock the turn
-      if (!prev.pendingCard) {
-        return prev.turnState === 'waiting_for_action' || prev.turnState === 'processing' ? withFreshTimer(prev) : prev;
-      }
+      if (!prev.pendingCard || prev.turn !== turnAtCall) return prev;
       const resolved = resolvePendingCard(prev);
       return resolved.gamePhase === 'ended' ? resolved : withFreshTimer(resolved);
     });
-  }, [setGameState]);
+  }, [setGameState, gameState.turn]);
 
-  // Workers: assign/remove
+  // Workers: assign/remove — validated against the live state, on your own turn, before you roll
   const assignWorker = useCallback((propertyId: string, color: string) => {
-    const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
-    if (!cp) return;
-    const property = gameState.properties.find(p => p.id === propertyId);
-    if (!property || property.owner !== cp.name || property.type !== 'property') return;
-    const existing = (gameState.workers || []).find(w => w.propertyId === propertyId);
-    if (existing) return;
-    const newWorker: Worker = {
-      id: `worker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      ownerId: cp.id,
-      propertyId,
-      color
-    };
-    setGameState(prev => ({ ...prev, workers: [...(prev.workers || []), newWorker] }));
-    addGameEvent('build', cp.name, `assigned a worker to ${property.name}`);
-  }, [gameState.players, gameState.currentPlayer, gameState.properties, gameState.workers, addGameEvent, setGameState]);
+    setGameState(withActor((prev, actor) => {
+      if (!prev.settings.workersEnabled) return prev;
+      const property = prev.properties.find(p => p.id === propertyId);
+      if (!property || property.owner !== actor.name || property.type !== 'property' || property.isInactive) return prev;
+      if ((prev.workers || []).some(w => w.propertyId === propertyId)) return prev;
+      const newWorker: Worker = {
+        id: `worker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        ownerId: actor.id,
+        propertyId,
+        color
+      };
+      return addEvent({ ...prev, workers: [...(prev.workers || []), newWorker] }, 'build', actor.name, `assigned a worker to ${property.name}`);
+    }));
+  }, [setGameState, localPlayerId]);
 
   const removeWorker = useCallback((propertyId: string) => {
-    const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
-    const property = gameState.properties.find(p => p.id === propertyId);
-    setGameState(prev => ({ ...prev, workers: (prev.workers || []).filter(w => w.propertyId !== propertyId) }));
-    if (cp && property) addGameEvent('build', cp.name, `removed worker from ${property.name}`);
-  }, [gameState.currentPlayer, gameState.players, gameState.properties, addGameEvent, setGameState]);
+    setGameState(withActor((prev, actor) => {
+      const worker = (prev.workers || []).find(w => w.propertyId === propertyId);
+      if (!worker || worker.ownerId !== actor.id) return prev;
+      const property = prev.properties.find(p => p.id === propertyId);
+      const next = { ...prev, workers: (prev.workers || []).filter(w => w.propertyId !== propertyId) };
+      return property ? addEvent(next, 'build', actor.name, `removed worker from ${property.name}`) : next;
+    }));
+  }, [setGameState, localPlayerId]);
 
   const updateWorkerColor = useCallback((propertyId: string, color: string) => {
-    setGameState(prev => ({
+    setGameState((prev: GameState) => ({
       ...prev,
-      workers: (prev.workers || []).map(w => w.propertyId === propertyId ? { ...w, color } : w)
+      workers: (prev.workers || []).map(w =>
+        w.propertyId === propertyId && (!localPlayerId || w.ownerId === localPlayerId) ? { ...w, color } : w)
     }));
-  }, [setGameState]);
+  }, [setGameState, localPlayerId]);
 
   // Bot dice roll — bypasses localPlayerId check, only works for isBot players
   const rollDiceForBot = useCallback(() => {
@@ -1218,7 +1234,6 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     endAuctionNow,
     purchaseProperty,
     skipPurchase,
-    makeOffer,
     mortgageProperty,
     unmortgageProperty,
     createTeam,

@@ -77,7 +77,6 @@ const MonopolyGame: React.FC = () => {
     endAuctionNow,
     purchaseProperty,
     skipPurchase,
-    makeOffer,
     mortgageProperty,
     unmortgageProperty,
     createTeam,
@@ -188,49 +187,34 @@ const MonopolyGame: React.FC = () => {
     isRolling
   ]);
 
-  // Bot Noob trade responder — accept/reject offers addressed to the bot
-  const botRespondedTradeIds = React.useRef<Set<string>>(new Set());
+  // Bot Noob trade responder — accept/reject offers addressed to the bot.
+  // Each offer is scheduled once; the timer is NOT cancelled when another offer arrives (that used to strand the
+  // first one), and the decision re-reads the live offer when it fires.
+  const botScheduledTradeIds = React.useRef<Set<string>>(new Set());
+  const liveStateRef = React.useRef(gameState);
+  liveStateRef.current = gameState;
+  const botOfferKey = gameState.tradeOffers
+    .filter(o => o.status === 'pending' && gameState.players.find(p => p.isBot)?.name === o.toPlayer)
+    .map(o => o.id).join(',');
   useEffect(() => {
-    const botPlayer = gameState.players.find(p => p.isBot);
-    if (!botPlayer || gameState.gamePhase !== 'playing') return;
-
-    const unhandled = gameState.tradeOffers.filter(
-      o => o.status === 'pending'
-        && o.toPlayer === botPlayer.name
-        && !botRespondedTradeIds.current.has(o.id)
-    );
-    if (unhandled.length === 0) return;
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    unhandled.forEach(offer => {
-      botRespondedTradeIds.current.add(offer.id);
-      const botName = botPlayer.name;
-      // Capture property values now (before async delay)
-      const giveValue = offer.requestedProperties.reduce((sum, id) => {
-        const p = gameState.properties.find(prop => prop.id === id);
-        return sum + (p?.currentValue || 0);
-      }, 0) + offer.requestedCash;
-      const getValue = offer.offeredProperties.reduce((sum, id) => {
-        const p = gameState.properties.find(prop => prop.id === id);
-        return sum + (p?.currentValue || 0);
-      }, 0) + offer.offeredCash;
-
-      timers.push(setTimeout(() => {
+    const botPlayer = liveStateRef.current.players.find(p => p.isBot);
+    if (!botPlayer || liveStateRef.current.gamePhase !== 'playing' || !botOfferKey) return;
+    botOfferKey.split(',').forEach(offerId => {
+      if (botScheduledTradeIds.current.has(offerId)) return;
+      botScheduledTradeIds.current.add(offerId);
+      setTimeout(() => {
+        const st = liveStateRef.current;
+        const offer = st.tradeOffers.find(o => o.id === offerId);
+        if (!offer || offer.status !== 'pending') return;
+        const valueOf = (ids: string[]) => ids.reduce((sum, id) => sum + (st.properties.find(p => p.id === id)?.currentValue || 0), 0);
+        const giveValue = valueOf(offer.requestedProperties) + offer.requestedCash;
+        const getValue = valueOf(offer.offeredProperties) + offer.offeredCash;
         // Accept if getting >= 85% of value given, or 25% random goodwill
-        if (getValue >= giveValue * 0.85 || Math.random() < 0.25) {
-          acceptTradeOfferRef.current(offer.id, botName);
-        } else {
-          rejectTradeOfferRef.current(offer.id);
-        }
-      }, 2000 + Math.random() * 2000));
+        if (getValue >= giveValue * 0.85 || Math.random() < 0.25) acceptTradeOfferRef.current(offer.id, botPlayer.name);
+        else rejectTradeOfferRef.current(offer.id);
+      }, 2000 + Math.random() * 2000);
     });
-
-    return () => timers.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    gameState.tradeOffers.length,
-    gameState.gamePhase
-  ]);
+  }, [botOfferKey]);
 
   // Bot Noob bids on live auctions (independent of whose turn it is)
   useEffect(() => {
@@ -260,6 +244,16 @@ const MonopolyGame: React.FC = () => {
     gameState.currentAuction?.highestBidder,
     gameState.gamePhase
   ]);
+
+  // A rejected/failed Firestore write used to vanish into the console
+  useEffect(() => {
+    const onWriteError = (e: Event) => {
+      toast({ title: 'Action not saved', description: `The server rejected or lost that move (${(e as CustomEvent).detail}). Check your connection and try again.`, variant: 'destructive', duration: 6000 });
+      setCardResolved(false);
+    };
+    window.addEventListener('mma:write-error', onWriteError);
+    return () => window.removeEventListener('mma:write-error', onWriteError);
+  }, [toast]);
 
   // Win toast — fires once when winnerId is set
   useEffect(() => {
@@ -398,20 +392,6 @@ const MonopolyGame: React.FC = () => {
     gameState.gamePhase,
   ]);
 
-  if (!currentPlayer || !myPlayer) {
-    console.log("Waiting for players...");
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="text-xl font-bold flex flex-col items-center text-slate-700">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          Loading Game State...
-        </div>
-      </div>
-    );
-  }
-
-  const myOwnedProperties = gameState.properties.filter(p => p.owner === myPlayer.name);
-  const ownedProperties = gameState.properties.filter(p => p.owner === currentPlayer.name);
 
   // Host heartbeat and cleanup
   useEffect(() => {
@@ -420,15 +400,9 @@ const MonopolyGame: React.FC = () => {
     // Heartbeat every 30 seconds to keep game active
     const heartbeat = setInterval(async () => {
       try {
-        const roomRef = doc(db, 'games', lobbyCode);
-        const snap = await getDoc(roomRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          await setDoc(roomRef, {
-            ...data,
-            lastUpdated: Date.now()
-          });
-        }
+        // Touch ONLY lastUpdated. (It used to read the whole room and write it back, which could revert a
+        // game action committed in between — including the 'ended' status.)
+        await updateDoc(doc(db, 'games', lobbyCode), { lastUpdated: Date.now() });
       } catch (e) {
         console.error("Heartbeat error:", e);
       }
@@ -573,7 +547,22 @@ const MonopolyGame: React.FC = () => {
   // Reset offer dismissed state when local player moves to a new position
   useEffect(() => {
     setOfferDismissed(false);
-  }, [myPlayer.position, gameState.currentPlayer]);
+  }, [myPlayer?.position, gameState.currentPlayer]);
+
+  if (!currentPlayer || !myPlayer) {
+    console.log("Waiting for players...");
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-xl font-bold flex flex-col items-center text-slate-700">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+          Loading Game State...
+        </div>
+      </div>
+    );
+  }
+
+  const myOwnedProperties = gameState.properties.filter(p => p.owner === myPlayer.name);
+  const ownedProperties = gameState.properties.filter(p => p.owner === currentPlayer.name);
 
   const handlePropertyClick = (property: Property) => {
     if (property.type === 'special') {
@@ -636,12 +625,15 @@ const MonopolyGame: React.FC = () => {
         players = [hostPlayer, botPlayer];
       }
 
+      // A configured draft queue runs before play, even against the bot
+      const draftFirst = !!(settings.auctionsEnabled && (settings.preAuctionProperties || []).length > 0);
       const firstState: GameState = {
          ...initialState,
          players,
          workers: [],
          pendingCard: null,
-         gamePhase: settings.singlePlayer ? 'playing' : 'setup',
+         gamePhase: settings.singlePlayer ? (draftFirst ? 'auction' : 'playing') : 'setup',
+         preAuctionPhase: !!(settings.singlePlayer && draftFirst),
          // Initialize the turn timer immediately for single-player so the first turn has a countdown
          turnEndTime: (settings.singlePlayer && settings.turnTimerDuration && settings.turnTimerDuration > 0)
            ? Date.now() + (settings.turnTimerDuration * 1000)
@@ -668,7 +660,7 @@ const MonopolyGame: React.FC = () => {
       setShowLobby(false);
     } catch (e: any) {
       console.error("Firebase Room Creation Error:", e);
-      alert("Failed to create the room! Please verify your Firebase Security Rules say 'allow read, write: if true;'. Error: " + e.message);
+      alert("Failed to create the room. Check that Anonymous sign-in is enabled in the Firebase console and that firestore.rules is deployed (see README → Firebase setup). Error: " + e.message);
     }
   };
 
@@ -676,7 +668,7 @@ const MonopolyGame: React.FC = () => {
     try {
       const roomRef = doc(db, 'games', code);
       // One transaction: simultaneous joins can no longer overwrite each other or share a player id
-      const result = await runTransaction(db, async (tx): Promise<{ id: string } | { error: string }> => {
+      const result = await runTransaction(db, async (tx): Promise<{ id: string; host?: boolean } | { error: string }> => {
         const snap = await tx.get(roomRef);
         if (!snap.exists()) return { error: 'Room not found! Please check the code and try again.' };
         const data = snap.data();
@@ -697,7 +689,7 @@ const MonopolyGame: React.FC = () => {
               : p
           );
           tx.update(roomRef, { gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now() });
-          return { id: existingPlayer.id };
+          return { id: existingPlayer.id, host: !!myUid && data.hostUid === myUid };
         }
 
         if (state.players.length >= state.settings.maxPlayers) return { error: 'Lobby is currently full!' };
@@ -737,7 +729,10 @@ const MonopolyGame: React.FC = () => {
             }
           }
         }
-        tx.update(roomRef, { gameState: next, lastUpdated: Date.now(), playerCount: next.players.length });
+        tx.update(roomRef, {
+          gameState: next, lastUpdated: Date.now(), playerCount: next.players.length,
+          status: next.gamePhase === 'setup' ? 'waiting' : 'playing'
+        });
         return { id: joinedPlayerId };
       });
 
@@ -747,7 +742,7 @@ const MonopolyGame: React.FC = () => {
       }
       setLobbyCode(code);
       setLocalPlayerId(result.id);
-      setIsLobbyOwner(false);
+      setIsLobbyOwner(!!result.host); // a reconnecting host gets the host UI back
       setShowLobby(false);
     } catch (error) {
       console.error("Error joining room:", error);

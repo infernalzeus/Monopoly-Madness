@@ -282,11 +282,11 @@ const TradingSystem: React.FC<TradingSystemProps> = ({
                     </div>
                   </div>
 
-                  {isMyOffer && (
-                    <p className="text-xs text-slate-400 italic">Waiting for {offer.toPlayer}…</p>
+                  {!isForMe && (
+                    <p className="text-xs text-slate-400 italic">{isMyOffer ? `Waiting for ${offer.toPlayer}…` : `Offer to ${offer.toPlayer}`}</p>
                   )}
 
-                  {!isMyOffer && (
+                  {isForMe && (
                     <div className="flex gap-2 pt-1">
                       <Button
                         onClick={() => onAcceptTradeOffer(offer.id, currentPlayer.name)}

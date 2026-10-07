@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.6`**  
+> **Current Version: `v1.1.7`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,14 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.7 — Codex audit fixes
+
+Source: `AUDIT_REPORT.md` (code review, not playtested). Fixed: **A01** host heartbeat no longer rewrites the whole room (only `lastUpdated`) · **A03** every callback now depends on `setGameState`, which itself is stable (reads local state through a ref) — reject/cancel trade, settings, property editor, save/reset were silently local-only after joining · **A04/A05** jail pay/stay/card and `resolveCard` validate actor + the turn the click was made on inside the transaction; the blind "advance if blocked" fallback is gone · **A06** only the addressed player can accept/decline a trade, only the sender can withdraw · **A07** workers use `canBuildHouseOn/HotelOn` (full group, even build) and assignment is live-validated · **A08** `withActor` lets a human client drive the bot's turn · **A09** every active human can drive the draft (staggered by rank) · **A12** auctions are identified by `startTime`; bids/resolve carry it; a turn auction must come from the live purchase offer; only the seller can Collect early; sellers can't bid; bid log capped at 30 · **A15** one team membership per player, empty teams removed, win re-evaluated · **A16** bot answers every offer (timers no longer cancelled by later offers) · **A17** no-op writes skipped, write failures surface as a toast, expired offers pruned · **A18** error text no longer tells you to open the database · **A19** single-player runs the draft queue · **A20** room `status` derived from phase on every write · **A21** timer expiry carries the deadline it was scheduled for · host reconnect regains host UI · the "waiting for players" early return moved below all hooks (hook-order crash) · GO minimum in `RulesPanel` uses the setting.
+
+Open (need an owner rule decision): **A10** decline→auction automatic vs optional · **A11** minimum starting bid (70% shown, 10% accepted) · **A13** bankrupt tiles: neutral-with-historical-owner vs transfer · **A14** rent owed at arrival vs at payment · team consent policy. Architectural: **A02** per-action authorisation needs a server.
 
 ---
 

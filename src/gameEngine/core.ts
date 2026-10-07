@@ -180,25 +180,21 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
   let workerBuildDebt = 0;
   if (passedGo && state.settings.workersEnabled && state.workers && state.workers.length > 0) {
     const playerWorkers = state.workers.filter(w => w.ownerId === state.currentPlayer);
+    // Workers obey the same rules as a human builder (full group, even build, hotel only at 4 houses everywhere)
     playerWorkers.forEach(worker => {
-      propertiesAfterWorkers = propertiesAfterWorkers.map(prop => {
-        if (prop.id !== worker.propertyId) return prop;
-        if (prop.owner !== movingPlayerBefore.name) return prop;
-        if (prop.isMortgaged || prop.type !== 'property') return prop;
-        if (prop.hasHotel) return prop;
-        if (!prop.colorGroup) return prop;
-        if (prop.houses < 4) {
-          const cost = (prop.houseCost || 0) * (prop.houses + 1);
-          if (movingPlayerBefore.balance - workerBuildDebt < cost) return prop;
-          workerBuildDebt += cost;
-          return { ...prop, houses: prop.houses + 1 };
-        }
-        // 4 houses → upgrade to hotel
-        const cost = prop.hotelCost || 0;
-        if (movingPlayerBefore.balance - workerBuildDebt < cost) return prop;
+      const prop = propertiesAfterWorkers.find(p => p.id === worker.propertyId);
+      if (!prop) return;
+      if (canBuildHouseOn(propertiesAfterWorkers, prop, movingPlayerBefore.name)) {
+        const cost = (prop.houseCost || 0) * (prop.houses + 1);
+        if (movingPlayerBefore.balance - workerBuildDebt < cost) return;
         workerBuildDebt += cost;
-        return { ...prop, hasHotel: true, houses: 0 };
-      });
+        propertiesAfterWorkers = propertiesAfterWorkers.map(p => p.id === prop.id ? { ...p, houses: p.houses + 1 } : p);
+      } else if (canBuildHotelOn(propertiesAfterWorkers, prop, movingPlayerBefore.name)) {
+        const cost = prop.hotelCost || 0;
+        if (movingPlayerBefore.balance - workerBuildDebt < cost) return;
+        workerBuildDebt += cost;
+        propertiesAfterWorkers = propertiesAfterWorkers.map(p => p.id === prop.id ? { ...p, hasHotel: true, houses: 0 } : p);
+      }
     });
   }
 
