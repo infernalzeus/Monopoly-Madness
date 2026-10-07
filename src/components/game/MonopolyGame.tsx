@@ -14,7 +14,7 @@ import TradingSystem from './TradingSystem';
 import RentPaymentDialog from './RentPaymentDialog';
 import GameLog from './GameLog';
 import TeamPanel from './TeamPanel';
-import { db } from '@/lib/firebase';
+import { db, authReady, currentUid } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -59,6 +59,9 @@ const MonopolyGame: React.FC = () => {
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
   // Local flag to immediately hide the card dialog on click (Firestore update is async)
   const [cardResolved, setCardResolved] = useState(false);
+  // Wait for anonymous sign-in (resolves to null if the provider is off — the app then runs unauthenticated)
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
   // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
   const [playerPresence, setPlayerPresence] = useState<Record<string, number>>({});
   const { toast } = useToast();
@@ -106,6 +109,7 @@ const MonopolyGame: React.FC = () => {
     skipRent,
     payJailFine,
     skipJailTurn,
+    spendJailCard,
     getJailFineAmount,
     resolveCard,
     assignWorker,
@@ -137,7 +141,9 @@ const MonopolyGame: React.FC = () => {
         const jailBalance = activeCp.balance;
         timer = setTimeout(() => {
           const { fine } = getJailFineAmount();
-          if (fine > 0 && jailBalance >= fine) {
+          if ((activeCp.jailCards || 0) > 0) {
+            spendJailCardRef.current();
+          } else if (fine > 0 && jailBalance >= fine) {
             payJailFineRef.current();
           } else {
             skipJailTurnRef.current();
@@ -260,10 +266,12 @@ const MonopolyGame: React.FC = () => {
     if (!gameState.winnerId) return;
     const winner = gameState.players.find(p => p.id === gameState.winnerId);
     if (!winner) return;
-    if (winner.id === localPlayerId) {
-      toast({ title: '🏆 You Win!', description: `Congratulations ${winner.name}! You're the last player standing!`, duration: 12000 });
+    const winningTeam = gameState.winnerTeamId ? gameState.teams.find(t => t.id === gameState.winnerTeamId) : null;
+    const iWon = winningTeam ? myPlayer.teamId === winningTeam.id : winner.id === localPlayerId;
+    if (iWon) {
+      toast({ title: '🏆 You Win!', description: winningTeam ? `Team ${winningTeam.name} is the last alliance standing!` : `Congratulations ${winner.name}! You're the last player standing!`, duration: 12000 });
     } else {
-      toast({ title: `🏆 ${winner.name} Wins!`, description: `${winner.name} is the last player standing. Better luck next time!`, duration: 8000 });
+      toast({ title: winningTeam ? `🏆 Team ${winningTeam.name} Wins!` : `🏆 ${winner.name} Wins!`, description: winningTeam ? 'Only one alliance is left standing.' : `${winner.name} is the last player standing. Better luck next time!`, duration: 8000 });
     }
   }, [gameState.winnerId]);
 
@@ -312,6 +320,7 @@ const MonopolyGame: React.FC = () => {
   const endTurnRef = React.useRef(endTurn);
   const payRentRef = React.useRef(payRent);
   const payJailFineRef = React.useRef(payJailFine);
+  const spendJailCardRef = React.useRef(spendJailCard);
   const skipJailTurnRef = React.useRef(skipJailTurn);
   const purchasePropertyRef = React.useRef(purchaseProperty);
   const skipPurchaseRef = React.useRef(skipPurchase);
@@ -322,6 +331,7 @@ const MonopolyGame: React.FC = () => {
   useEffect(() => { endTurnRef.current = endTurn; }, [endTurn]);
   useEffect(() => { payRentRef.current = payRent; }, [payRent]);
   useEffect(() => { payJailFineRef.current = payJailFine; }, [payJailFine]);
+  useEffect(() => { spendJailCardRef.current = spendJailCard; }, [spendJailCard]);
   useEffect(() => { skipJailTurnRef.current = skipJailTurn; }, [skipJailTurn]);
   useEffect(() => { purchasePropertyRef.current = purchaseProperty; }, [purchaseProperty]);
   useEffect(() => { skipPurchaseRef.current = skipPurchase; }, [skipPurchase]);
@@ -602,6 +612,7 @@ const MonopolyGame: React.FC = () => {
         isInJail: false,
         jailTurns: 0,
         pieceIcon: icon || '🔵',
+        uid: currentUid() || undefined,
         discoveredProperties: [0]
       };
 
@@ -646,6 +657,7 @@ const MonopolyGame: React.FC = () => {
         gameState: firstState,
         status: settings.singlePlayer ? 'playing' : 'waiting',
         hostName: playerName,
+        hostUid: currentUid() || null,
         lastUpdated: Date.now(),
         playerCount: players.length
       });
@@ -670,12 +682,18 @@ const MonopolyGame: React.FC = () => {
         const data = snap.data();
         const state = data.gameState as GameState;
 
+        const myUid = currentUid() || undefined;
         const existingPlayer = state.players.find(p => p.name === playerName);
         if (existingPlayer) {
+          // A seat is bound to the browser (anonymous uid) that took it; another device can't claim the name.
+          // Legacy seats without a uid are claimed by whoever reconnects first.
+          if (existingPlayer.uid && myUid && existingPlayer.uid !== myUid) {
+            return { error: `"${playerName}" is already taken by another player. Pick a different name (or rejoin from the browser you started with).` };
+          }
           // Reconnect: restore identity, apply any newly-selected token color/icon
           const updatedPlayers = state.players.map(p =>
             p.id === existingPlayer.id
-              ? { ...p, color: color || p.color, pieceIcon: icon || p.pieceIcon, isActive: p.isActive }
+              ? { ...p, uid: p.uid || myUid, color: color || p.color, pieceIcon: icon || p.pieceIcon }
               : p
           );
           tx.update(roomRef, { gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now() });
@@ -701,6 +719,7 @@ const MonopolyGame: React.FC = () => {
           isInJail: false,
           jailTurns: 0,
           pieceIcon: icon || icons[state.players.length] || '👤',
+          uid: myUid,
           discoveredProperties: [0]
         };
 
@@ -750,6 +769,10 @@ const MonopolyGame: React.FC = () => {
     // In a real implementation, this would remove the event from the game state
     console.log('Dismissing event:', eventId);
   };
+
+  if (!authChecked) {
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-300 font-mono">Connecting…</div>;
+  }
 
   // Show lobby system if not in game yet
   if (showLobby) {
@@ -981,6 +1004,14 @@ const MonopolyGame: React.FC = () => {
                         </div>
                       ) : (
                         <p className="text-slate-400 text-sm">You have no property income — you cannot afford bail.</p>
+                      )}
+                      {(myPlayer.jailCards || 0) > 0 && (
+                        <button
+                          onClick={spendJailCard}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
+                        >
+                          🃏 Use Get Out of Jail Free card ({myPlayer.jailCards})
+                        </button>
                       )}
                       <div className="flex gap-3">
                         {jailFine > 0 && myPlayer.balance >= jailFine && (

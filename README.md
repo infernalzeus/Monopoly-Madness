@@ -31,3 +31,10 @@ To run the application locally:
    ```
 
 Enjoy your game!
+
+## Firebase setup
+1. Copy `.env.example` to `.env.local` and fill in your web-app values (Firebase Console → Project settings → Your apps).
+2. Console → Authentication → Sign-in method → enable **Anonymous** (each browser gets a stable uid that its seat is bound to).
+3. Deploy `firestore.rules` (Console → Firestore → Rules, or `firebase deploy --only firestore:rules`).
+4. Optional hardening: Google Cloud Console → APIs & Services → Credentials → restrict the browser key to your site's referrers.
+Web API keys are not secrets; the rules and the referrer restriction are what protect the project.

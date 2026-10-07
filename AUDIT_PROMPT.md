@@ -57,24 +57,24 @@ Specifically trace and report on:
   jail, owner bankrupt, landing on own property, mortgaged property of another player (purchase-at-mortgage path).
 - **Tax / GO / cards:** rounding, GO bonus on the move that also lands on Go to Jail, Chance with 0 properties.
 
-## Task 2 — missing or half-built features (report, rank, don't build unless marked)
-- Doubles / extra roll / triple-double jail (`GameState.doubleCount` and `DiceRoll.isDouble` exist but are unused).
-- Teams: `Team.sharedBalance` unused; win condition when all remaining players share a team; cross-teammate
-  monopoly rent bonus (TeamPanel claims it).
-- "Get out of jail free" (deleted dead code; decide: implement or drop from the rules text).
+## Task 2 — remaining missing features (report, rank, don't build unless marked)
+Already completed in v1.1.6 (verify, don't rebuild): doubles/extra roll/3-doubles jail, team win + shared-monopoly
+rent + no teammate rent, Get Out of Jail Free (house rule: Chance/CC on a double), trade lock on built groups,
+anonymous auth + uid-bound seats + `firestore.rules`.
+- Free Parking pot, house/hotel supply limits (decide per variant rules, document in `RulesPanel`).
 - Mortgage interest / forced liquidation before bankruptcy (sell buildings → mortgage → declare).
 - Spectator mode after bankruptcy; rejoin as spectator.
-- Free Parking pot, house/hotel supply limits (decide per variant rules, document in `RulesPanel`).
 - Rematch / reset-room flow, and cleaning up ended rooms in Firestore.
+- Review the v1.1.6 rule choices for fairness: teammate rent exemption, team-boosted monopoly rent, jail card on doubles.
 
 ## Task 3 — robustness & security
 - Firestore: document growth (1 MiB cap — `gameEvents`, `tradeOffers`, `bids`), transaction contention with 8 players,
   `runTransaction(...).catch(console.error)` swallowing failures (surface to the UI), listener leaks, optimistic UI
   lag (`cardResolved` local flag pattern — find similar double-click hazards).
-- Identity: reconnect-by-name allows impersonation; no per-player secret. Propose the smallest fix (stored token in
-  localStorage + hashed in doc) without adding a backend.
-- Firestore rules: current guidance is `allow read, write: if true`. Propose rules that at least restrict writes to
-  the `games/{room}` shape and cap size, and say what cannot be enforced without a server.
+- Identity: seats are bound to an anonymous-auth uid (v1.1.6). Review: lost-device recovery, uid in the shared doc,
+  actions are still not authorised per player (any signed-in client can write any state).
+- Firestore rules: `firestore.rules` exists (auth + shape + host-only delete). Review it for holes and say what
+  cannot be enforced without a server.
 - Timers: replace `Date.now()` authority with `serverTimestamp()`/offset estimation, or document the tolerance.
 - Dead code & duplicate logic (e.g. `computeRent` exists in both core and the hook; `PreAuctionPanel.tsx` is unmounted;
   `makeOffer`, `handleSellProperty`, `handleTradeOffer` stubs). List what to delete vs wire up.

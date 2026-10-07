@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { hasBuildingsInGroup } from '@/gameEngine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,9 +40,11 @@ const TradingSystem: React.FC<TradingSystemProps> = ({
   // targetPlayer stores player NAME for consistency with TradeOffer.toPlayer
   const [targetPlayer, setTargetPlayer] = useState<string>('');
 
+  // Properties in a colour group with buildings can't be traded until the buildings are sold
+  const tradableOwned = ownedProperties.filter(p => !hasBuildingsInGroup(allProperties, p));
   const targetPlayerData = allPlayers.find(p => p.name === targetPlayer);
   const targetPlayerProperties = targetPlayerData
-    ? allProperties.filter(p => p.owner === targetPlayerData.name && !p.isInactive)
+    ? allProperties.filter(p => p.owner === targetPlayerData.name && !p.isInactive && !hasBuildingsInGroup(allProperties, p))
     : [];
 
   const handleCreateTrade = () => {
@@ -131,9 +134,9 @@ const TradingSystem: React.FC<TradingSystemProps> = ({
                   Properties You're Offering
                 </label>
                 <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                  {ownedProperties.length === 0 ? (
+                  {tradableOwned.length === 0 ? (
                     <p className="text-slate-500 text-xs italic">You own no properties.</p>
-                  ) : ownedProperties.map(property => (
+                  ) : tradableOwned.map(property => (
                     <div
                       key={property.id}
                       className={`p-2 rounded border cursor-pointer transition-colors text-sm ${

@@ -3,7 +3,7 @@ import { db } from '../lib/firebase';
 import { doc, onSnapshot, runTransaction, setDoc, getDoc } from 'firebase/firestore';
 import {
   rollDiceLogic, handlePropertyPurchase, advanceTurn as advanceTurnLogic, computePlayerIncome,
-  applyPayment, addEvent, resolvePendingCard, canBuildHouseOn, canBuildHotelOn, canSellBuildingOn,
+  applyPayment, addEvent, resolvePendingCard, canBuildHouseOn, canBuildHotelOn, canSellBuildingOn, hasBuildingsInGroup,
   mortgagePayout, unmortgageCost
 } from '../gameEngine/core';
 
@@ -325,38 +325,6 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   // The local player's id, falling back to whoever's turn it is (local/offline play)
   const actingId = (prev: GameState) => localPlayerId || prev.currentPlayer;
 
-  const getOwnedCount = useCallback((ownerName: string, filter: (p: Property) => boolean) => {
-    return gameState.properties.filter(p => p.owner === ownerName && filter(p)).length;
-  }, [gameState.properties]);
-
-  const playerOwnsMonopoly = useCallback((ownerName: string, color: string) => {
-    const group = gameState.properties.filter(p => p.type === 'property' && p.colorGroup === color);
-    return group.length > 0 && group.every(p => p.owner === ownerName && !p.isMortgaged);
-  }, [gameState.properties]);
-
-  const computeRent = useCallback((property: Property, diceTotal: number | null) => {
-    if (property.isMortgaged) return 0;
-    if (property.type === 'railroad') {
-      const ownerName = property.owner as string;
-      const count = getOwnedCount(ownerName, p => p.type === 'railroad');
-      const index = Math.max(1, Math.min(4, count)) - 1;
-      return property.rent[index] || 0;
-    }
-    if (property.type === 'utility') {
-      const ownerName = property.owner as string;
-      const count = getOwnedCount(ownerName, p => p.type === 'utility');
-      const mult = count >= 2 ? 10 : 4; // Standard rules: 4x or 10x dice total
-      return (diceTotal || 0) * mult * 1000; // scale to thousands
-    }
-    if (property.type === 'property') {
-      // rent array indexes: [base, 1h, 2h, 3h, 4h, hotel]
-      if (property.hasHotel) return property.rent[5] || 0;
-      if (property.houses > 0) return property.rent[property.houses] || 0;
-      const hasMonopoly = property.colorGroup ? playerOwnsMonopoly(property.owner as string, property.colorGroup) : false;
-      return hasMonopoly ? Math.round((property.rent[0] || 0) * 2) : (property.rent[0] || 0);
-    }
-    return 0;
-  }, [getOwnedCount, playerOwnsMonopoly]);
 
   const makeAuction = (property: Property, duration: number, startedBy?: string | null, customStartingBid?: number): Auction => {
     const startTime = Date.now();
@@ -1001,7 +969,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       if (offeredCash < 0 || requestedCash < 0 || offeredCash > from.balance) return prev;
       const owns = (ids: string[], name: string) => ids.every(id => {
         const p = prev.properties.find(pp => pp.id === id);
-        return p && p.owner === name && !p.isInAuction && !p.isInactive;
+        return p && p.owner === name && !p.isInAuction && !p.isInactive && !hasBuildingsInGroup(prev.properties, p);
       });
       if (!owns(offeredProperties, from.name) || !owns(requestedProperties, to.name)) return prev;
 
@@ -1045,6 +1013,9 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
         const p = prev.properties.find(pp => pp.id === id);
         return p && p.owner === name && !p.isInAuction && !p.isInactive;
       });
+      const traded = [...offer.offeredProperties, ...offer.requestedProperties]
+        .map(id => prev.properties.find(pp => pp.id === id));
+      if (traded.some(p => p && hasBuildingsInGroup(prev.properties, p))) return cancel('sell the buildings in that colour group first');
       if (!owns(offer.offeredProperties, from.name) || !owns(offer.requestedProperties, acceptor.name)) return cancel('ownership changed');
       if (from.balance < offer.offeredCash) return cancel(`${from.name} can't cover the cash`);
       if (acceptor.balance < offer.requestedCash) return cancel(`${acceptor.name} can't cover the cash`);
@@ -1136,6 +1107,18 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     }));
     addGameEvent('jail', cp.name, `paid $${fine.toLocaleString('en-US')} jail fine (20% of $${income.toLocaleString('en-US')} property income)`, -fine);
   }, [gameState.players, gameState.currentPlayer, gameState.properties, addGameEvent, setGameState]);
+
+  // Spend a Get Out of Jail Free card: free release, you still roll this turn
+  const spendJailCard = useCallback(() => {
+    setGameState(withActor((prev, actor) => {
+      if (!actor.isInJail || (actor.jailCards || 0) <= 0 || prev.turnState !== 'waiting_for_roll') return prev;
+      const next = {
+        ...prev,
+        players: prev.players.map(p => p.id === actor.id ? { ...p, jailCards: (p.jailCards || 0) - 1, isInJail: false, jailTurns: 0 } : p)
+      };
+      return addEvent(next, 'jail', actor.name, 'used a Get Out of Jail Free card');
+    }));
+  }, [setGameState, localPlayerId]);
 
   const skipJailTurn = useCallback(() => {
     const cp = gameState.players.find(p => p.id === gameState.currentPlayer);
@@ -1272,6 +1255,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     // Jail functions
     payJailFine,
     skipJailTurn,
+    spendJailCard,
     getJailFineAmount,
     // Card resolution
     resolveCard,

@@ -31,6 +31,8 @@ export interface Player {
   isInJail: boolean;
   jailTurns: number;
   teamId?: string;
+  uid?: string;        // Firebase anonymous-auth uid that owns this seat (blocks reconnect-by-name impersonation)
+  jailCards?: number;  // 'Get out of jail free' cards held
   pieceIcon: string;
   isBot?: boolean;
   isSpectator?: boolean;
@@ -112,6 +114,7 @@ export interface PendingCard {
   amount: number;
   isReward: boolean;
   numProperties: number;
+  jailCard?: boolean; // landed on a double: also awards a Get Out of Jail Free card
 }
 
 export interface DiceRoll {
@@ -144,6 +147,7 @@ export interface GameState {
   doubleCount: number;
   pendingPurchase?: { propertyId: string; playerId: string } | null;
   winnerId?: string | null;
+  winnerTeamId?: string | null; // set when the game ends because only one team is left
   turnState: 'waiting_for_roll' | 'waiting_for_action' | 'processing' | 'completed';
   preAuctionPhase: boolean;
   consoleOpen: boolean;

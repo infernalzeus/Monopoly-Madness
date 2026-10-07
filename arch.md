@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.5`**  
+> **Current Version: `v1.1.6`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -61,7 +61,7 @@ monopoly-madness-auction/
 │   │       ├── TeamPanel.tsx      # Team alliances and shared balances
 │   │       ├── TradingSystem.tsx  # Dynamic property and cash trade builder
 │   │       ├── AuctionPanel.tsx   # Regular turn bidding module
-│   │       ├── PreAuctionPanel.tsx# Draft bidding phase component
+│   │       ├── PreAuctionPanel.tsx (removed v1.1.6)
 │   │       ├── PlayerPanel.tsx    # Portfolio list, house builders, mortgages
 │   │       ├── GameConsole.tsx    # Property configuration and customization
 │   │       ├── DiceRoller.tsx     # 3D/Visual dice roll triggers
@@ -574,6 +574,22 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.6 — Half-built features completed + identity/auth
+
+| Feature | Behaviour |
+|---|---|
+| **Doubles** | Roll doubles → same player rolls again (after resolving the move). `doubleCount` tracks the streak; **3rd double → Jail**. Jailed/bankrupt players don't re-roll. The extra roll clears `lastDiceRoll`, so idling out on it hands the turn over normally. Implemented in `rollDiceLogic` + `advanceTurn` (`core.ts`). |
+| **Teams** | `sameTeam()`: teammates **don't pay each other rent** and **count towards each other's colour-group monopolies** (rent ×2, `computeRent(…, teamPlayers)`). **Win:** once any player is eliminated, the game ends when every survivor is on one team (`winnerTeamId`, win toast names the team). `Team.sharedBalance` is unused — Combined Wealth is derived. |
+| **Get Out of Jail Free** | House rule: landing on Chance/Community Chest **on a double** also awards a card (`Player.jailCards`, `PendingCard.jailCard`). Jail dialog has *Use card*; Bot Noob uses it first. (Rule choice is arbitrary — change in `movePlayer`.) |
+| **Trading buildings** | Standard rule: nothing in a colour group can be traded while any property in it has buildings (`hasBuildingsInGroup`). Enforced at create + accept; `TradingSystem` hides locked properties. |
+| **Anonymous auth** | `firebase.ts` `authReady` signs every browser in anonymously (uid persisted by Firebase). Seats store `Player.uid`; **a name already bound to another uid can't be reclaimed** (impersonation fix). If the provider is off it resolves `null` and the app still runs. |
+| **Firestore rules** | `firestore.rules`: signed-in only, ≤8 players, 40 properties, `hostUid` immutable, host-only delete, room id length. Rooms now carry `hostUid`. Deploy **after** enabling Anonymous auth (README → Firebase setup). |
+| **Cleanup** | Unmounted `PreAuctionPanel.tsx` and the hook's duplicate `computeRent` removed. |
+
+Still open: client-clock authority (`Date.now()` for timers), per-action authorisation (rules can't check game logic), Free Parking pot, supply limits, spectator-after-bankruptcy, rematch/room cleanup, tests runner.
 
 ---
 

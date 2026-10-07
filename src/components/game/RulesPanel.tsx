@@ -46,6 +46,7 @@ const RulesPanel: React.FC<RulesPanelProps> = ({ settings, onClose }) => {
             <Rule>Roll two dice on your turn and move that many spaces around the board.</Rule>
             <Rule>The board has 40 spaces — when you pass or land on GO, collect <strong className="text-yellow-300">10% of your current cash</strong> (minimum $2,00,000).</Rule>
             <Rule>If you roll doubles, you may roll again after your turn resolves. Three consecutive doubles sends you to Jail.</Rule>
+            <Rule>Landing on Chance or Community Chest <strong className="text-yellow-300">on a double</strong> also earns a Get Out of Jail Free card (use it from the Jail dialog).</Rule>
           </Section>
 
           <Section title="Buying Properties" emoji="🏘️">
@@ -104,7 +105,8 @@ const RulesPanel: React.FC<RulesPanelProps> = ({ settings, onClose }) => {
             <Section title="Teams" emoji="👥">
               <Rule>Players can form teams and view combined wealth in the Team Panel.</Rule>
               <Rule>Both players in a team keep their own balance, properties, and turns — no merging.</Rule>
-              <Rule>Colour group monopolies can be shared across teammates for strategic benefit.</Rule>
+              <Rule>Colour group monopolies count across teammates (2× rent), and <strong className="text-yellow-300">teammates never pay each other rent</strong>.</Rule>
+              <Rule>Once any player is eliminated, the game ends as soon as everyone left is on the same team.</Rule>
             </Section>
           )}
 

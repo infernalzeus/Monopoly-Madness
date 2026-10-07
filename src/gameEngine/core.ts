@@ -1,5 +1,19 @@
 import { GameState, DiceRoll, Player, Property, GameEvent, PendingCard, Worker } from '../types/game';
 
+// Teammates (teamsEnabled) don't pay each other rent and count towards each other's colour-group monopolies.
+export const sameTeam = (players: Player[], nameA?: string | null, nameB?: string | null): boolean => {
+  if (!nameA || !nameB) return false;
+  if (nameA === nameB) return true;
+  const a = players.find(p => p.name === nameA);
+  const b = players.find(p => p.name === nameB);
+  return !!(a?.teamId && a.teamId === b?.teamId);
+};
+
+// Standard rule: nothing in a colour group can be traded while any property in it has buildings.
+export const hasBuildingsInGroup = (properties: Property[], property: Property): boolean =>
+  property.type === 'property' && !!property.colorGroup &&
+  properties.some(p => p.type === 'property' && p.colorGroup === property.colorGroup && (p.houses > 0 || p.hasHotel));
+
 // Helper to add GameEvent cleanly
 export const addEvent = (state: GameState, type: GameEvent['type'], player: string, message: string, amount?: number): GameState => {
   const event: any = {
@@ -51,9 +65,21 @@ export const advanceTurn = (rawState: GameState): GameState => {
     nextIndex = (nextIndex + 1) % playerCount;
   }
 
+  // Doubles: the same player rolls again (unless jailed / bankrupt). lastDiceRoll is cleared for the
+  // extra roll, so an idle timeout on it falls through to a normal hand-over.
+  const cur = state.players[currentIndex];
+  if (state.lastDiceRoll?.isDouble && (state.doubleCount || 0) > 0 && cur && cur.isActive && !cur.isInJail && !cur.isSpectator) {
+    const again: GameState = {
+      ...state, turn: state.turn + 1, turnState: 'waiting_for_roll', lastDiceRoll: null,
+      pendingPurchase: null, pendingRent: null, pendingCard: null
+    };
+    return addEvent(again, 'move', cur.name, `rolled doubles — ${cur.name} rolls again`);
+  }
+
   const nextPlayer = state.players[nextIndex];
   let nextState: GameState = {
     ...state,
+    doubleCount: 0,
     turn: state.turn + 1,
     currentPlayer: nextPlayer.id,
     turnState: 'waiting_for_roll',
@@ -98,11 +124,19 @@ export const rollDiceLogic = (state: GameState, diceResult: DiceRoll): GameState
       const remaining = Math.max(0, (p.jailTurns || 0) - 1);
       return { ...p, jailTurns: remaining, isInJail: remaining > 0 };
     });
-    nextState = { ...nextState, players, turnState: 'completed' as const };
+    nextState = { ...nextState, players, doubleCount: 0, turnState: 'completed' as const };
     return addEvent(nextState, 'move', currentPlayerData.name, 'turn skipped while in Jail');
   }
 
-  return movePlayer(nextState, diceResult.total);
+  const doubles = diceResult.isDouble ? (state.doubleCount || 0) + 1 : 0;
+  if (doubles >= 3) {
+    // Three doubles in a row: straight to jail
+    const players = nextState.players.map(p =>
+      p.id === nextState.currentPlayer ? { ...p, position: 10, isInJail: true, jailTurns: 3 } : p);
+    nextState = { ...nextState, players, doubleCount: 0, turnState: 'completed' as const };
+    return addEvent(nextState, 'jail', currentPlayerData.name, `rolled three doubles in a row and was sent to Jail!`);
+  }
+  return movePlayer({ ...nextState, doubleCount: doubles }, diceResult.total);
 };
 
 export const movePlayer = (state: GameState, spaces: number): GameState => {
@@ -195,8 +229,9 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
   // Check rent — jailed owners and inactive properties cannot collect rent
   if (isBuyable && landedProperty && landedProperty.isOwned && !landedProperty.isInactive && landedProperty.owner !== movingPlayer.name && !landedProperty.isMortgaged) {
     const ownerPlayer = state.players.find(p => p.name === landedProperty.owner);
-    if (!ownerPlayer?.isInJail) {
-      const rentAmount = computeRent(state.properties, landedProperty, state.lastDiceRoll?.total || 0);
+    const teammate = state.settings.teamsEnabled && sameTeam(state.players, landedProperty.owner, movingPlayer.name);
+    if (!ownerPlayer?.isInJail && !teammate) {
+      const rentAmount = computeRent(state.properties, landedProperty, state.lastDiceRoll?.total || 0, state.settings.teamsEnabled ? state.players : undefined);
       if (rentAmount > 0) {
         nextState = {
           ...nextState,
@@ -234,7 +269,8 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
       income,
       amount,
       isReward: isOdd,
-      numProperties
+      numProperties,
+      jailCard: !!state.lastDiceRoll?.isDouble
     };
     nextState = { ...nextState, pendingCard, turnState: 'waiting_for_action' };
   }
@@ -264,7 +300,7 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
 };
 
 // Simplified rent calculation (pure)
-export const computeRent = (properties: Property[], property: Property, diceTotal: number): number => {
+export const computeRent = (properties: Property[], property: Property, diceTotal: number, teamPlayers?: Player[]): number => {
   if (property.isMortgaged) return 0;
   if (property.type === 'railroad') {
     const count = properties.filter(p => p.type === 'railroad' && p.owner === property.owner).length;
@@ -282,7 +318,7 @@ export const computeRent = (properties: Property[], property: Property, diceTota
     const hasMonopoly = property.colorGroup
       && properties
           .filter(p => p.type === 'property' && p.colorGroup === property.colorGroup)
-          .every(p => p.owner === property.owner && !p.isMortgaged);
+          .every(p => (p.owner === property.owner || (!!teamPlayers && sameTeam(teamPlayers, p.owner, property.owner))) && !p.isMortgaged);
     return hasMonopoly ? property.rent[0] * 2 : property.rent[0];
   }
   return 0;
@@ -308,6 +344,11 @@ export const checkWinCondition = (state: GameState): GameState => {
   const activePlayers = state.players.filter(p => p.isActive && !p.isSpectator);
   if (activePlayers.length === 1 && !state.winnerId) {
     return { ...state, winnerId: activePlayers[0].id, gamePhase: 'ended' };
+  }
+  // Team mode: once someone has been eliminated, the game ends when every survivor is on one team
+  if (state.settings.teamsEnabled && !state.winnerId && activePlayers.length > 1 && state.players.some(p => !p.isActive) &&
+      activePlayers.every(p => p.teamId && p.teamId === activePlayers[0].teamId)) {
+    return { ...state, winnerId: activePlayers[0].id, winnerTeamId: activePlayers[0].teamId, gamePhase: 'ended' };
   }
   return state;
 };
@@ -357,6 +398,10 @@ export const resolvePendingCard = (state: GameState): GameState => {
 
   const amount = pc.amount ?? 0;
   const label = pc.type === 'chance' ? 'Chance' : 'Community Chest';
+  if (pc.jailCard) {
+    cleared.players = cleared.players.map(p => p.id === cp.id ? { ...p, jailCards: (p.jailCards || 0) + 1 } : p);
+    cleared.gameEvents = addEvent(cleared, 'card', cp.name, `${label}: doubles! Got a Get Out of Jail Free card`).gameEvents;
+  }
   const rollLabel = `roll ${pc.diceRoll} — ${pc.diceRoll % 2 !== 0 ? 'odd' : 'even'}`;
   if (amount <= 0) {
     return addEvent(cleared, 'card', cp.name, `${label} (${rollLabel}): No properties — no change`);
