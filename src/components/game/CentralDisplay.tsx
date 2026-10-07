@@ -180,7 +180,7 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
           style={{ backgroundColor: playerColor, borderColor: playerColor, color: readableTextOn(playerColor) }}
         >
           <User className="w-3 h-3" />
-          {currentPlayer}'s Turn
+          {isMyTurn ? 'Your Turn' : `${currentPlayer}'s Turn`}
         </Badge>
 
         {/* Dice display — always visible once a roll happened or rolling */}

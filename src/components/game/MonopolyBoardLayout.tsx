@@ -399,7 +399,8 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
         {/* Central Space */}
         <div className="bg-slate-950 flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 shadow-inner border border-slate-800 relative" style={{ gridRow: '2 / 11', gridColumn: '2 / 11' }}>
           {stageOverlay}
-          {children || (
+          {/* The dice/turn display is ALWAYS rendered; an action stage (children) is layered on top of it. */}
+          {(
             <CentralDisplay
                currentEvent={currentEvent}
                currentPlayer={currentPlayer}
@@ -418,6 +419,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
                turnTimerDuration={turnTimerDuration}
             />
           )}
+          {children}
         </div>
       </div>
     </div>

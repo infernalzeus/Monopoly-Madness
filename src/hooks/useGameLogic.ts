@@ -456,7 +456,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       });
       setIsRolling(false);
     }, 800);
-  }, [gameState.currentPlayer, gameState.turnState, localPlayerId, isRolling, setGameState, rollDice]);
+  }, [gameState.currentPlayer, gameState.turnState, gameState.gamePhase, localPlayerId, isRolling, setGameState, rollDice]);
 
   
 
