@@ -224,7 +224,7 @@ const LobbySystem: React.FC<LobbySystemProps> = ({ onCreateLobby, onJoinLobby })
           <p className="text-sm text-cyan-400/70 mb-5">
             Buy, bid at auction, build with workers, team up with friends — or take on Bot Noob solo. Last millionaire standing wins!
           </p>
-          <p className="text-xs text-cyan-400/40 font-mono tracking-wider mb-6">v1.1.7</p>
+          <p className="text-xs text-cyan-400/40 font-mono tracking-wider mb-6">v1.1.8</p>
           {/* Feature highlight pills */}
           <div className="flex flex-wrap justify-center gap-2 mb-2">
             {[

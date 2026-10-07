@@ -328,7 +328,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 className="w-full text-xs"
               >
                 <Banknote className="w-3 h-3 mr-1" />
-                Unmortgage ({formatCurrency(Math.round(property.mortgageValue * 1.1))})
+                Unmortgage ({formatCurrency(Math.round(Math.round(property.currentValue * 0.5) * 1.1))})
               </Button>
             ) : (
               <Button
@@ -338,7 +338,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 className="w-full text-xs"
               >
                 <DollarSign className="w-3 h-3 mr-1" />
-                Mortgage (+{formatCurrency(property.mortgageValue)})
+                Mortgage (+{formatCurrency(Math.round(property.currentValue * 0.5))})
               </Button>
             )}
           </div>

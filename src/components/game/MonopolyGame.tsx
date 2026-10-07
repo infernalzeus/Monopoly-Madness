@@ -15,6 +15,7 @@ import RentPaymentDialog from './RentPaymentDialog';
 import GameLog from './GameLog';
 import TeamPanel from './TeamPanel';
 import { db, authReady, currentUid } from '@/lib/firebase';
+import { readableTextOn } from '@/lib/utils';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -61,6 +62,7 @@ const MonopolyGame: React.FC = () => {
   const [cardResolved, setCardResolved] = useState(false);
   // Wait for anonymous sign-in (resolves to null if the provider is off — the app then runs unauthenticated)
   const [authChecked, setAuthChecked] = useState(false);
+  const [winnerDismissed, setWinnerDismissed] = useState(false);
   useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
   // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
   const [playerPresence, setPlayerPresence] = useState<Record<string, number>>({});
@@ -244,6 +246,13 @@ const MonopolyGame: React.FC = () => {
     gameState.currentAuction?.highestBidder,
     gameState.gamePhase
   ]);
+
+  // Escape closes the property / special-tile overlays
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelectedProperty(null); setSelectedSpecialProperty(null); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // A rejected/failed Firestore write used to vanish into the console
   useEffect(() => {
@@ -777,9 +786,9 @@ const MonopolyGame: React.FC = () => {
   if (gameState.gamePhase === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-        <div className="text-center text-white bg-slate-900/50 p-8 rounded-xl border border-cyan-400/30">
-          <h1 className="text-4xl font-bold mb-4">Waiting for players to join...</h1>
-          <p className="text-2xl mb-8 font-mono bg-black/40 py-2 px-4 rounded-lg inline-block text-green-400">
+        <div className="text-center text-white bg-slate-900/50 p-4 sm:p-8 rounded-xl border border-cyan-400/30 w-full max-w-3xl">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-4">Waiting for players to join...</h1>
+          <p className="text-lg sm:text-2xl mb-8 font-mono bg-black/40 py-2 px-4 rounded-lg inline-block text-green-400 break-all">
             Lobby Code: {lobbyCode}
           </p>
           <p className="text-xl mb-4 text-cyan-200">
@@ -791,7 +800,7 @@ const MonopolyGame: React.FC = () => {
               const isAway = !lastSeen || Date.now() - lastSeen > 45000;
               return (
                 <div key={p.id} className="flex items-center gap-1">
-                  <Badge style={{backgroundColor: p.color}} className="text-xl py-3 px-6 shadow-lg text-white border-2 border-white/20">
+                  <Badge style={{backgroundColor: p.color, color: readableTextOn(p.color)}} className="text-base sm:text-xl py-2 sm:py-3 px-3 sm:px-6 shadow-lg border-2 border-white/20 max-w-full">
                     <span className="mr-2 text-2xl" dangerouslySetInnerHTML={{__html: p.pieceIcon}} />
                     {p.name}
                     {isAway && <span className="ml-2 text-sm text-red-200 opacity-80">⚠️ Away</span>}
@@ -851,6 +860,44 @@ const MonopolyGame: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 text-slate-100">
+      {/* Screen-reader status: whose turn + latest event (polite, so it never interrupts) */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {gameState.gamePhase === 'ended' ? 'Game over.' : `${currentPlayer.name}'s turn.`}{' '}
+        {gameState.gameEvents.length > 0 ? `${gameState.gameEvents[gameState.gameEvents.length - 1].player} ${gameState.gameEvents[gameState.gameEvents.length - 1].message}` : ''}
+      </div>
+
+      {/* Persistent result screen (the win toast used to be the only signal) */}
+      {gameState.gamePhase === 'ended' && !winnerDismissed && (() => {
+        const winner = gameState.players.find(p => p.id === gameState.winnerId);
+        const winTeam = gameState.winnerTeamId ? gameState.teams.find(t => t.id === gameState.winnerTeamId) : null;
+        const worth = (p: Player) => p.balance + gameState.properties.filter(pr => pr.owner === p.name && !pr.isInactive).reduce((a, pr) => a + pr.currentValue, 0);
+        const standings = [...gameState.players].sort((a, b) => Number(b.isActive) - Number(a.isActive) || worth(b) - worth(a));
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Game over">
+            <div className="w-full max-w-md bg-slate-900 border-2 border-amber-400/70 rounded-2xl p-5 space-y-4 shadow-2xl">
+              <div className="text-center">
+                <div className="text-xs uppercase tracking-widest text-amber-300">Game over</div>
+                <h2 className="text-2xl font-black text-white mt-1">{winTeam ? `Team ${winTeam.name} wins` : winner ? `${winner.name} wins` : 'No winner'}</h2>
+              </div>
+              <ol className="space-y-1.5">
+                {standings.map((p, i) => (
+                  <li key={p.id} className="flex items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
+                    <span className="w-5 text-slate-400 font-mono">{i + 1}</span>
+                    <span className="w-1.5 self-stretch rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
+                    <span className="flex-1 truncate font-semibold text-slate-100">{p.name}{p.id === localPlayerId ? ' (you)' : ''}</span>
+                    <span className={p.isActive ? 'text-slate-200 font-mono' : 'text-rose-300'}>{p.isActive ? `$${worth(p).toLocaleString('en-US')}` : 'Bankrupt'}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="flex gap-3">
+                <button onClick={() => setWinnerDismissed(true)} className="flex-1 min-h-[44px] rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold text-sm">View board</button>
+                <button onClick={() => { window.location.href = window.location.pathname; }} className="flex-1 min-h-[44px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm">Back to lobby</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Rules Panel */}
       {showRules && (
         <RulesPanel settings={gameState.settings} onClose={() => setShowRules(false)} />
@@ -860,6 +907,7 @@ const MonopolyGame: React.FC = () => {
       {selectedSpecialProperty && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          role="dialog" aria-modal="true" aria-label="Tile information"
           onClick={() => setSelectedSpecialProperty(null)}
         >
           <div className="w-full max-w-sm" onClick={e => e.stopPropagation()}>
@@ -879,6 +927,7 @@ const MonopolyGame: React.FC = () => {
       {selectedProperty && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          role="dialog" aria-modal="true" aria-label="Property details"
           onClick={() => setSelectedProperty(null)}
         >
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm transform transition-all animate-in zoom-in-95 duration-200">
@@ -922,19 +971,19 @@ const MonopolyGame: React.FC = () => {
             </div>
             <div className="flex items-center gap-1">
               {isLobbyOwner && gameState.settings.allowPropertyEditing && (
-                <Button onClick={() => setIsEditorOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-7 px-2 border border-purple-400/50">
+                <Button aria-label="Property editor" onClick={() => setIsEditorOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-7 px-2 border border-purple-400/50">
                   ✏️ Edit
                 </Button>
               )}
               {gameState.settings.workersEnabled && (
-                <Button onClick={() => setIsWorkerPanelOpen(true)} className="bg-amber-700 hover:bg-amber-600 text-white font-bold text-xs h-7 px-2 border border-amber-500/50">
+                <Button aria-label="Worker assignment" onClick={() => setIsWorkerPanelOpen(true)} className="bg-amber-700 hover:bg-amber-600 text-white font-bold text-xs h-7 px-2 border border-amber-500/50">
                   👷
                 </Button>
               )}
-              <Button onClick={() => setShowAchievements(true)} className="bg-yellow-700/80 hover:bg-yellow-600 text-white font-bold text-xs h-7 px-2 border border-yellow-500/50" title="Achievements">
+              <Button aria-label="Achievements" onClick={() => setShowAchievements(true)} className="bg-yellow-700/80 hover:bg-yellow-600 text-white font-bold text-xs h-7 px-2 border border-yellow-500/50" title="Achievements">
                 🏆 {unlockedAchievements.size}/{ACHIEVEMENTS.length}
               </Button>
-              <Button onClick={() => setShowRules(true)} className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs h-7 px-2 border border-slate-500/60">
+              <Button aria-label="Game rules" onClick={() => setShowRules(true)} className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs h-7 px-2 border border-slate-500/60">
                 📖
               </Button>
             </div>
@@ -946,7 +995,12 @@ const MonopolyGame: React.FC = () => {
       <div className="flex flex-col gap-6">
         {/* Top/Main Area - Game Board and Dice */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <div className="w-full lg:w-3/4 flex justify-center">
+          <div className="w-full lg:w-3/4 flex flex-col items-center gap-2">
+          {showWorkerNudge && (
+            <div role="status" className="w-full max-w-4xl bg-amber-900/80 border border-amber-500/60 text-amber-100 text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg text-center">
+              Assign workers before rolling — open Workers in the header
+            </div>
+          )}
           <MonopolyBoardLayout
             properties={gameState.properties}
             players={gameState.players}
@@ -972,8 +1026,9 @@ const MonopolyGame: React.FC = () => {
             turnTimerDuration={gameState.settings.turnTimerDuration}
           >
             {(showJailDialog || myPendingCard || myPendingRentData || landedOnOwnProperty || ownedPropertyOnTile || currentAuctionData || (pendingPurchaseData && isMyTurn)) ? (
-              <div className="absolute inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-slate-950/90 rounded-sm backdrop-blur-sm overflow-y-auto overflow-x-hidden pointer-events-auto">
-                <div className="w-full max-w-sm h-fit">
+              <div className="absolute inset-0 z-50 flex p-1 sm:p-4 bg-slate-950/90 rounded-sm backdrop-blur-sm overflow-y-auto overflow-x-hidden pointer-events-auto max-sm:fixed max-sm:z-[120] max-sm:p-0 max-sm:items-end max-sm:bg-slate-950/80" role="dialog" aria-modal="true" aria-label="Your turn: action required">
+                {/* m-auto centres a short panel and top-aligns a tall one (flex centring clipped the header); on phones it is a bottom sheet */}
+                <div className="w-full max-w-sm h-fit m-auto max-sm:m-0 max-sm:max-w-none max-sm:max-h-[88vh] max-sm:overflow-y-auto max-sm:rounded-t-2xl max-sm:border-t max-sm:border-slate-700 max-sm:pb-[env(safe-area-inset-bottom)]">
                   {showJailDialog ? (
                     <div className="bg-slate-900 rounded-xl shadow-2xl w-full border-2 border-rose-500 p-5 space-y-4">
                       <div className="flex items-center justify-between gap-3">
@@ -1153,12 +1208,6 @@ const MonopolyGame: React.FC = () => {
                       auctionsEnabled={gameState.settings.auctionsEnabled}
                     />
                   )}
-                </div>
-              </div>
-            ) : showWorkerNudge ? (
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none">
-                <div className="bg-amber-900/90 border border-amber-500/60 text-amber-200 text-xs font-semibold px-4 py-2 rounded-full shadow-lg animate-pulse whitespace-nowrap">
-                  👷 Assign workers before rolling — tap 👷 in the header
                 </div>
               </div>
             ) : null}

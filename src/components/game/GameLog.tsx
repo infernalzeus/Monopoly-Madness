@@ -7,6 +7,7 @@ import {
   Building, CreditCard, AlertCircle, Dice1, Dice2
 } from 'lucide-react';
 import { GameEvent, Player } from '@/types/game';
+import { formatSignedMoney } from '@/lib/utils';
 
 interface GameLogProps {
   events: GameEvent[];
@@ -47,8 +48,7 @@ const GameLog: React.FC<GameLogProps> = ({ events, players = [] }) => {
 
   const formatAmount = (amount?: number) => {
     if (amount === undefined) return '';
-    const sign = amount >= 0 ? '+' : '';
-    return `${sign}$${Math.abs(amount).toLocaleString('en-US')}`;
+    return formatSignedMoney(amount);
   };
 
   return (

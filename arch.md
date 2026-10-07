@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.7`**  
+> **Current Version: `v1.1.8`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,14 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.8 — UI audit fixes (`UI_AUDIT_REPORT.md`)
+
+**U01** the workers nudge replaced the whole centre stage (no Roll Dice in workers mode) → it is now a banner above the board (`MonopolyBoardLayout` also gained a non-replacing `stageOverlay` prop) · **U02** action panels: `m-auto` centring (no clipped headers) and a **bottom sheet on phones** (`max-sm:fixed`, `role="dialog"`) · **U05** `formatSignedMoney()` (`lib/utils.ts`): losses render `−$750,000` in log, toasts, centre display · **U07** `readableTextOn()` picks dark/light text on player-colour badges (white on cyan/amber failed AA) · **U08** board tiles show mortgaged (hatch + M), bankrupt/neutral (grey + X), larger owner dot, keyboard-operable tiles with labels · **U09** waiting room no longer overflows at 390px · **U10** persistent game-over card (winner/team, standings, Back to lobby; rematch intentionally absent) · **U04** 44px minimum touch target on coarse pointers (`index.css`, opt-out `.no-touch-min`, used by board tiles) · **U06** (part) tiles/mini cards are buttons, Escape closes property overlays, `role=dialog` on overlays, polite `aria-live` status region · **U12/U13** (part) mortgaged tiles say "Mortgaged · no rent", utilities "dice × …", mortgage/unmortgage amounts match the engine (50% of market value, +10%) · **U14** `prefers-reduced-motion` CSS · **U15** (part) aria-labels on icon-only header buttons.
+
+Not done (design work for the GPT redesign): U03 phone board legibility, U11 auction hierarchy/ring, U16 trade form, U17 phone sheets/editor layout, dark-theming `RentPaymentDialog`, emoji→SVG icons, JS dice/hop reduced-motion, draft progress/eligibility reasons (needs new data).
 
 ---
 

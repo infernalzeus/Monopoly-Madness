@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { X, DollarSign, Home, TrendingUp, TrendingDown } from 'lucide-react';
 import { GameEvent } from '@/types/game';
+import { formatSignedMoney } from '@/lib/utils';
 
 interface TransactionNotificationProps {
   events: GameEvent[];
@@ -94,7 +95,7 @@ const TransactionNotification: React.FC<TransactionNotificationProps> = ({
                 <div className="text-[0.7rem] opacity-80 leading-tight">{event.message}</div>
                 {event.amount !== undefined && (
                   <div className={`text-xs font-bold mt-0.5 ${event.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {event.amount >= 0 ? '+' : ''}${Math.abs(event.amount).toLocaleString('en-US')}
+                    {formatSignedMoney(event.amount)}
                   </div>
                 )}
               </div>

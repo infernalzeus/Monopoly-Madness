@@ -122,3 +122,17 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+/* Touch targets: on touch devices every button/link control is at least 44x44 (opt out with .no-touch-min) */
+@media (pointer: coarse) {
+  button:not(.no-touch-min), [role="button"]:not(.no-touch-min) { min-height: 44px; min-width: 44px; }
+}
+
+/* Respect the OS "reduce motion" setting: snap animations/transitions to their end state */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

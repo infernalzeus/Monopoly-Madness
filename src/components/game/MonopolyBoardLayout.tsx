@@ -22,6 +22,7 @@ interface MonopolyBoardLayoutProps {
   turnState?: string;
   playerColor: string;
   children?: React.ReactNode;
+  stageOverlay?: React.ReactNode; // shown over the central display WITHOUT replacing it (e.g. hints)
   blindPickEnabled?: boolean;
   discoveredProperties?: number[];
   tradingEnabled?: boolean;
@@ -84,6 +85,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
   turnState,
   playerColor,
   children,
+  stageOverlay,
   blindPickEnabled = false,
   discoveredProperties = [],
   tradingEnabled = false,
@@ -295,10 +297,25 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
           cursor-pointer transition-all relative rounded-sm border border-slate-800 flex flex-col bg-slate-900
           ${selectedProperty?.id === property.id ? 'ring-2 ring-inset ring-blue-500 z-10' : 'hover:bg-slate-800'}
           ${isChanceOrCC ? 'bg-gradient-to-b from-slate-900 to-yellow-950/20' : ''}
+          no-touch-min ${property.isInactive ? 'grayscale opacity-60' : ''}
         `}
         style={{ gridRow: row, gridColumn: col }}
         onClick={() => isDiscovered && onPropertyClick(property)}
+        role="button"
+        tabIndex={isDiscovered ? 0 : -1}
+        aria-label={isDiscovered ? `${property.name}${property.isOwned ? `, owned by ${property.owner}` : ''}${property.isInactive ? ', bankrupt (neutral)' : ''}${property.isMortgaged ? ', mortgaged' : ''}` : 'Undiscovered tile'}
+        onKeyDown={(e) => { if (isDiscovered && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onPropertyClick(property); } }}
       >
+        {/* Mortgaged: diagonal hatch + M tag; bankrupt/neutral: grey + X tag (text backup so colour isn't the only cue) */}
+        {isDiscovered && property.isMortgaged && !property.isInactive && (
+          <div className="absolute inset-0 z-[12] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,0.55) 3px 5px)' }}>
+            <span className="absolute bottom-0 left-0 bg-rose-700 text-white font-black leading-none px-[2px] text-[0.4rem] sm:text-[0.5rem]">M</span>
+          </div>
+        )}
+        {isDiscovered && property.isInactive && (
+          <span className="absolute bottom-0 left-0 z-[12] bg-slate-600 text-white font-black leading-none px-[2px] text-[0.4rem] sm:text-[0.5rem] pointer-events-none">X</span>
+        )}
+
         {/* Colour bar — always use inline style so custom hex colours work */}
         {isDiscovered && hexColor && (
           <div className={`${colorBarClass} z-0`} style={{ backgroundColor: hexColor }} />
@@ -355,7 +372,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
           <div className="absolute top-0.5 right-0.5 z-[15] flex gap-0.5 pointer-events-none">
             {property.isOwned && (
               <div
-                className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-white/50 shadow-md flex-shrink-0"
+                className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-white/70 shadow-md flex-shrink-0"
                 style={{ backgroundColor: players.find(p => p.name === property.owner)?.color || '#999' }}
               />
             )}
@@ -379,6 +396,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
         
         {/* Central Space */}
         <div className="bg-slate-950 flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 shadow-inner border border-slate-800 relative" style={{ gridRow: '2 / 11', gridColumn: '2 / 11' }}>
+          {stageOverlay}
           {children || (
             <CentralDisplay
                currentEvent={currentEvent}

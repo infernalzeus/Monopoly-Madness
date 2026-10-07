@@ -71,6 +71,11 @@ const PropertyMiniCard: React.FC<PropertyMiniCardProps> = ({
         ? { backgroundColor: `${hex}22`, borderLeftColor: hex, borderLeftWidth: 3 }
         : { backgroundColor: 'rgba(51,65,85,0.5)' }}
       onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isSelected}
+      aria-label={`${property.name}${property.isMortgaged ? ', mortgaged' : ''}`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
     >
       {/* Colour strip */}
       {hex && <div className="h-1.5 w-full" style={{ backgroundColor: hex }} />}
@@ -90,7 +95,15 @@ const PropertyMiniCard: React.FC<PropertyMiniCardProps> = ({
         {/* Value + rent */}
         <div className="flex gap-2 text-[0.6rem]">
           <span className="text-slate-400">${(property.currentValue / 1000).toFixed(0)}K</span>
-          <span className="text-emerald-400">Rent ${(currentRent / 1000).toFixed(0)}K</span>
+          {property.isInactive ? (
+            <span className="text-slate-400">Neutral tile</span>
+          ) : property.isMortgaged ? (
+            <span className="text-rose-300">Mortgaged · no rent</span>
+          ) : property.type === 'utility' ? (
+            <span className="text-emerald-400">Rent: dice × $4K/$10K</span>
+          ) : (
+            <span className="text-emerald-400">Rent ${(currentRent / 1000).toFixed(0)}K</span>
+          )}
         </div>
 
         {/* Expanded detail card */}
@@ -134,7 +147,7 @@ const PropertyMiniCard: React.FC<PropertyMiniCardProps> = ({
               </div>
             )}
             {/* Mortgage value */}
-            <div className="text-[0.6rem] text-slate-500">Mortgage: ${((property.mortgageValue) / 1000).toFixed(0)}K</div>
+            <div className="text-[0.6rem] text-slate-500">Mortgage: ${(Math.round(property.currentValue * 0.5) / 1000).toFixed(0)}K</div>
             {/* Action buttons */}
             <div className="flex gap-1 pt-0.5">
               {!property.isMortgaged ? (

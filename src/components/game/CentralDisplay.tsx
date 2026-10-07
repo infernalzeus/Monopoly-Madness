@@ -15,6 +15,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { GameEvent, DiceRoll } from '@/types/game';
+import { formatSignedMoney, readableTextOn } from '@/lib/utils';
 
 interface CentralDisplayProps {
   currentEvent: GameEvent | null;
@@ -144,7 +145,7 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
 
   const formatAmount = (amount?: number) => {
     if (amount === undefined) return '';
-    return `${amount >= 0 ? '+' : ''}$${Math.abs(amount).toLocaleString('en-US')}`;
+    return formatSignedMoney(amount);
   };
 
   useEffect(() => {
@@ -174,7 +175,7 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
         {/* Current Player Badge */}
         <Badge
           className="text-xs sm:text-sm px-3 py-1 text-white border-2 flex items-center gap-1"
-          style={{ backgroundColor: playerColor, borderColor: playerColor }}
+          style={{ backgroundColor: playerColor, borderColor: playerColor, color: readableTextOn(playerColor) }}
         >
           <User className="w-3 h-3" />
           {currentPlayer}'s Turn

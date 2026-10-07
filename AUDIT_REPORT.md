@@ -2,6 +2,8 @@
 
 Reviewed against `AUDIT_PROMPT.md` and `arch.md` (v1.1.6).
 
+> **Later UI review / v1.1.7 working-copy update:** see `UI_AUDIT_REPORT.md` for the current UI findings. Reverification now reports **17 passing offline checks, zero failures, one deferred bankruptcy ownership check**, a passing build, and the same six missing-package type errors. The report below preserves the earlier v1.1.6 snapshot; its findings and line references are not a fresh full audit of v1.1.7.
+
 **Outcome:** multiplayer state can be overwritten by the host heartbeat; several actions are still unsafe under stale state; trading permits third-party acceptance through the normal UI; workers bypass building rules; bot jail-card use can stall. The build passes, but the application is not ready to call multiplayer correctness verified.
 
 Scope: code review of engine, state adapter, room lifecycle, rules, and game UI; offline behavioral checks. No production Firebase reads/writes, browser game sessions, emulator tests, deployment, commits, or pushes. Findings about races and rules are source-confirmed, not experimentally verified against a live database. The supplied canvas was not accessed because it is outside this project in the wiki.
