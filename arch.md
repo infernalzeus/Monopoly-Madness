@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.10`**  
+> **Current Version: `v1.1.11`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,12 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.11 — remaining kit pieces wired (`SheetsHost.tsx`)
+
+`WorkersHost` (WorkersSheet), `TeamsHost` (TeamsSheet; team name via a prompt), `PortfolioHost` (PlayerSheet: cash, net worth, rank, true rent labels, Mortgage/Unmortgage with the engine's amounts and reasons when disabled), `TileSummaryStrip` (SelectedTileSummary). On phones/tablets (<1024px) tapping a tile shows a readable summary strip under the board with a Details button; "My properties" and "Teams" buttons open bottom sheets and the old PlayerPanel/TeamPanel are desktop-only. Desktop keeps tile-tap → details overlay. Not replaced: board cells (`PropertyTile` — the 11×11 board can't meet 44px targets on a phone, so the board stays a map with the summary strip as the accessible detail), `PlayerIdentity`/`CurrencyAmount` inside legacy panels.
 
 ---
 

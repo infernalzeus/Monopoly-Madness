@@ -21,6 +21,7 @@ import '@/ui-kit/tokens.css';
 import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
 import StageHost from './StageHost';
 import TradeHost from './TradeHost';
+import { WorkersHost, TeamsHost, PortfolioHost, TileSummaryStrip } from './SheetsHost';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -74,6 +75,9 @@ const MonopolyGame: React.FC = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [winnerDismissed, setWinnerDismissed] = useState(false);
   const [roomCopied, setRoomCopied] = useState(false);
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
+  const [isTeamsOpen, setIsTeamsOpen] = useState(false);
+  const [summaryProperty, setSummaryProperty] = useState<Property | null>(null);
   useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
   // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
   const [playerPresence, setPlayerPresence] = useState<Record<string, number>>({});
@@ -602,6 +606,8 @@ const MonopolyGame: React.FC = () => {
   const handlePropertyClick = (property: Property) => {
     if (property.type === 'special') {
       setSelectedSpecialProperty(property);
+    } else if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+      setSummaryProperty(property); // phones/tablets: readable summary under the board, details one tap away
     } else {
       setSelectedProperty(property);
     }
@@ -1092,6 +1098,14 @@ const MonopolyGame: React.FC = () => {
               ) : null}
             />
           </MonopolyBoardLayout>
+          {summaryProperty && (() => {
+            const live = gameState.properties.find(p => p.id === summaryProperty.id) ?? summaryProperty;
+            return (
+              <div className="w-full max-w-4xl lg:hidden">
+                <TileSummaryStrip gameState={gameState} property={live} onDetails={() => setSelectedProperty(live)} />
+              </div>
+            );
+          })()}
           </div>
           
             <div className="w-full lg:w-1/4 space-y-6">
@@ -1114,7 +1128,16 @@ const MonopolyGame: React.FC = () => {
                 ))}
               </div>
               
-              {/* My Portfolio */}
+              {/* Phone shortcuts: portfolio / teams / workers open as bottom sheets */}
+              <div className="flex flex-wrap gap-2 lg:hidden">
+                <button onClick={() => setIsPortfolioOpen(true)} className="min-h-[44px] px-4 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-semibold">My properties</button>
+                {gameState.settings.teamsEnabled && (
+                  <button onClick={() => setIsTeamsOpen(true)} className="min-h-[44px] px-4 rounded-lg bg-indigo-900/70 border border-indigo-500/60 text-indigo-100 text-sm font-semibold">Teams</button>
+                )}
+              </div>
+
+              {/* My Portfolio (desktop; phones use the sheet) */}
+              <div className="hidden lg:block">
               <PlayerPanel
                 currentPlayer={myPlayer}
                 allPlayers={gameState.players}
@@ -1124,17 +1147,18 @@ const MonopolyGame: React.FC = () => {
                 onMortgage={mortgageProperty}
                 onUnmortgage={unmortgageProperty}
               />
+              </div>
 
               {/* Team Panel - Only visible if teams enabled */}
               {gameState.settings.teamsEnabled && (
-                <TeamPanel
+                <div className="hidden lg:block"><TeamPanel
                   currentPlayer={myPlayer}
                   teams={gameState.teams}
                   players={gameState.players}
                   onJoinTeam={joinTeam}
                   onCreateTeam={createTeam}
                   locked={gameState.turn >= gameState.players.length}
-                />
+                /></div>
               )}
             </div>
         </div>
@@ -1272,96 +1296,27 @@ const MonopolyGame: React.FC = () => {
         </div>
       </div>
 
-      {/* Workers Panel Dialog */}
-      {gameState.settings.workersEnabled && (
-        <Dialog open={isWorkerPanelOpen} onOpenChange={setIsWorkerPanelOpen}>
-          <DialogContent className="max-w-lg bg-slate-900 border-2 border-amber-500 text-white max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-amber-400 flex items-center gap-2">
-                👷 Worker Assignment
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <p className="text-slate-400 text-sm">
-                Workers live on your properties and build automatically — one house each time you pass GO. At 4 houses they upgrade to a hotel. Pick their look before assigning.
-              </p>
-              {/* Worker color picker */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-amber-300">Worker Appearance</label>
-                <div className="flex gap-2 flex-wrap items-center">
-                  {['#000000', '#3A3A3A', '#7A6A5A', '#B8A090', '#FFE5B4', '#FFF0D8', '#FFFFFF'].map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setWorkerPickColor(c)}
-                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${workerPickColor === c ? 'border-amber-400 scale-110' : 'border-slate-600'}`}
-                      style={{ backgroundColor: c }}
-                      title={c}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={workerPickColor}
-                    onChange={e => setWorkerPickColor(e.target.value)}
-                    className="w-7 h-7 rounded cursor-pointer border border-slate-600 bg-transparent"
-                    title="Custom color"
-                  />
-                </div>
-              </div>
+      {/* Workers (kit WorkersSheet via adapter) */}
+      {gameState.settings.workersEnabled && isWorkerPanelOpen && (
+        <SheetDock>
+          <WorkersHost gameState={gameState} me={myPlayer} isMyTurn={isMyTurn} onClose={() => setIsWorkerPanelOpen(false)}
+            assignWorker={assignWorker} removeWorker={removeWorker} updateWorkerColor={updateWorkerColor} />
+        </SheetDock>
+      )}
 
-              {/* Property list for assignment */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-amber-300">Your Properties</label>
-                {myOwnedProperties.filter(p => p.type === 'property').length === 0 ? (
-                  <p className="text-slate-500 text-sm italic">You don't own any properties yet.</p>
-                ) : (
-                  myOwnedProperties.filter(p => p.type === 'property').map(prop => {
-                    const worker = (gameState.workers || []).find(w => w.propertyId === prop.id);
-                    return (
-                      <div key={prop.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2 border border-slate-700">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {worker && (
-                            <div className="w-4 h-4 rounded-full border border-black/30 flex-shrink-0" style={{ backgroundColor: worker.color }} title="Worker" />
-                          )}
-                          <span className="text-sm text-white truncate">{prop.name}</span>
-                          <span className="text-xs text-slate-500">
-                            {prop.hasHotel ? '🏨' : prop.houses > 0 ? `🏠×${prop.houses}` : '—'}
-                          </span>
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          {!worker ? (
-                            <button
-                              onClick={() => assignWorker(prop.id, workerPickColor)}
-                              disabled={!isMyTurn || gameState.turnState !== 'waiting_for_roll'}
-                              title={(!isMyTurn || gameState.turnState !== 'waiting_for_roll') ? 'Can only assign before rolling on your turn' : ''}
-                              className="text-xs bg-amber-700 hover:bg-amber-600 text-white px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              Assign
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => updateWorkerColor(prop.id, workerPickColor)}
-                                className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded transition-colors"
-                              >
-                                Recolor
-                              </button>
-                              <button
-                                onClick={() => removeWorker(prop.id)}
-                                className="text-xs bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded transition-colors"
-                              >
-                                Remove
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+      {/* Portfolio sheet (phones) */}
+      {isPortfolioOpen && (
+        <SheetDock>
+          <PortfolioHost gameState={gameState} me={myPlayer} isMyTurn={isMyTurn} onClose={() => setIsPortfolioOpen(false)}
+            mortgageProperty={mortgageProperty} unmortgageProperty={unmortgageProperty} />
+        </SheetDock>
+      )}
+
+      {/* Teams sheet (phones) */}
+      {gameState.settings.teamsEnabled && isTeamsOpen && (
+        <SheetDock>
+          <TeamsHost gameState={gameState} me={myPlayer} onClose={() => setIsTeamsOpen(false)} joinTeam={joinTeam} createTeam={createTeam} />
+        </SheetDock>
       )}
 
       {/* Achievements Dialog */}
