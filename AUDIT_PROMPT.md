@@ -6,7 +6,7 @@ Paste everything below the line into Codex, run from the repo root
 ---
 
 You are auditing a real-time multiplayer Monopoly variant (React + TypeScript + Vite; Firebase Firestore as the only
-backend). **Read `arch.md` first** (state machine, data model, v1.1.5 section), then `src/gameEngine/core.ts`,
+backend). **Read `arch.md` first** (state machine, data model, v1.1.5 and v1.1.6 sections), then `src/gameEngine/core.ts`,
 `src/hooks/useGameLogic.ts`, `src/types/game.ts`, then the components. The vault canvas
 `monopoly-madness-architecture.canvas` has the one-page picture.
 
@@ -46,8 +46,7 @@ Specifically trace and report on:
 - **Auction:** start conditions, bid validation, timer extension, bidder bankruptcy/disconnect mid-auction, seller
   proceeds, property mortgaged/traded while in auction, clock skew between clients (endTimestamp is a client clock),
   draft with 0 / 1 / many properties, draft when a bot or a disconnected host is involved.
-- **Trading:** offers involving mortgaged properties, properties with buildings (they currently transfer with the
-  buildings and no even-build re-check), a bankrupt party, offers made on someone else's turn, third-party "accept"
+- **Trading:** offers involving mortgaged properties, properties in a colour group with buildings (v1.1.6 blocks these — verify it can't be bypassed), a bankrupt party, offers made on someone else's turn, third-party "accept"
   (`acceptorName`), cash-only trades, simultaneous accepts, expiry.
 - **Money conservation:** write a property-style check (random action sequences against `core.ts` + pure
   transitions) asserting total cash + (bank flows) is conserved and no active player ever has `balance < 0`.
@@ -76,8 +75,8 @@ anonymous auth + uid-bound seats + `firestore.rules`.
 - Firestore rules: `firestore.rules` exists (auth + shape + host-only delete). Review it for holes and say what
   cannot be enforced without a server.
 - Timers: replace `Date.now()` authority with `serverTimestamp()`/offset estimation, or document the tolerance.
-- Dead code & duplicate logic (e.g. `computeRent` exists in both core and the hook; `PreAuctionPanel.tsx` is unmounted;
-  `makeOffer`, `handleSellProperty`, `handleTradeOffer` stubs). List what to delete vs wire up.
+- Dead code & duplicate logic (`makeOffer`, `handleSellProperty`, `handleTradeOffer`, PlayerPanel `onSell`/`onTrade`
+  stubs, `Team.sharedBalance`, `GameMode` 'draft'|'custom'). List what to delete vs wire up.
 
 ## Task 4 — tests
 There is no test runner. Propose (and, if cheap, add) **Vitest** with:
