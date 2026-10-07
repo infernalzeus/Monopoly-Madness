@@ -42,9 +42,13 @@ export const settlePending = (state: GameState): GameState => {
     const prop = s.properties.find(p => p.id === propertyId);
     const payer = s.players.find(p => p.id === s.currentPlayer);
     s = { ...s, pendingRent: null };
-    if (payer) {
-      s = applyPayment(s, s.currentPlayer, owner, amount, 'Rent');
+    const creditor = s.players.find(p => p.name === owner);
+    if (payer && creditor && creditor.isActive) {
+      // Timer ran out: cover the debt by selling buildings / mortgaging before anyone goes bankrupt
+      s = applyPayment(s, s.currentPlayer, owner, amount, 'Rent', { liquidate: true });
       s = addEvent(s, 'rent', payer.name, `paid $${amount.toLocaleString('en-US')} rent to ${owner}${prop ? ` for ${prop.name}` : ''}`, -amount);
+    } else if (payer) {
+      s = addEvent(s, 'rent', payer.name, `rent to ${owner} waived — they are out of the game`);
     }
   }
   if (s.pendingPurchase) s = { ...s, pendingPurchase: null };
@@ -184,12 +188,12 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
     playerWorkers.forEach(worker => {
       const prop = propertiesAfterWorkers.find(p => p.id === worker.propertyId);
       if (!prop) return;
-      if (canBuildHouseOn(propertiesAfterWorkers, prop, movingPlayerBefore.name)) {
+      if (canBuildHouseOn(propertiesAfterWorkers, prop, movingPlayerBefore.name, !!state.settings.supplyLimits)) {
         const cost = (prop.houseCost || 0) * (prop.houses + 1);
         if (movingPlayerBefore.balance - workerBuildDebt < cost) return;
         workerBuildDebt += cost;
         propertiesAfterWorkers = propertiesAfterWorkers.map(p => p.id === prop.id ? { ...p, houses: p.houses + 1 } : p);
-      } else if (canBuildHotelOn(propertiesAfterWorkers, prop, movingPlayerBefore.name)) {
+      } else if (canBuildHotelOn(propertiesAfterWorkers, prop, movingPlayerBefore.name, !!state.settings.supplyLimits)) {
         const cost = prop.hotelCost || 0;
         if (movingPlayerBefore.balance - workerBuildDebt < cost) return;
         workerBuildDebt += cost;
@@ -253,6 +257,16 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
     };
   }
 
+  // Free Parking: collect the pot (only when the variant is on)
+  if (landedProperty?.name === 'Free Parking' && nextState.settings.freeParkingPot && (nextState.freeParkingPot || 0) > 0) {
+    const pot = nextState.freeParkingPot || 0;
+    nextState = {
+      ...nextState, freeParkingPot: 0,
+      players: nextState.players.map(p => p.id === state.currentPlayer ? { ...p, balance: p.balance + pot } : p)
+    };
+    nextState = addEvent(nextState, 'pay', movingPlayer.name, `collected the Free Parking pot: +$${pot.toLocaleString('en-US')}`, pot);
+  }
+
   // Chance / Community Chest — income-based reward or penalty
   if (landedProperty?.name === 'Chance' || landedProperty?.name === 'Community Chest') {
     const { income, numProperties } = computePlayerIncome(state.properties, movingPlayer.name);
@@ -287,7 +301,7 @@ export const movePlayer = (state: GameState, spaces: number): GameState => {
     const totalFinance = movingPlayer.balance + propertyValue;
     const taxAmount = Math.round((totalFinance * 0.1) / 100) * 100; // 10% rounded to nearest 100
 
-    nextState = applyPayment(nextState, state.currentPlayer, null, taxAmount, 'Tax Payment');
+    nextState = applyPayment(nextState, state.currentPlayer, null, taxAmount, 'Tax Payment', { liquidate: true });
     nextState = addEvent(nextState, 'tax', movingPlayer.name, `paid $${taxAmount.toLocaleString('en-US')} in ${landedProperty.name}`, -taxAmount);
     nextState = { ...nextState, turnState: 'completed' };
   }
@@ -351,6 +365,10 @@ export const checkWinCondition = (state: GameState): GameState => {
 
 // ── Build / mortgage rules (single source of truth for hook + UI) ──────────────
 export const buildLevel = (p: Property): number => (p.hasHotel ? 5 : p.houses);
+export const HOUSE_SUPPLY = 32;
+export const HOTEL_SUPPLY = 12;
+export const housesInPlay = (properties: Property[]): number => properties.reduce((n, p) => n + (p.houses || 0), 0);
+export const hotelsInPlay = (properties: Property[]): number => properties.filter(p => p.hasHotel).length;
 export const mortgagePayout = (p: Property): number => Math.round(p.currentValue * 0.5);
 export const unmortgageCost = (p: Property): number => Math.round(mortgagePayout(p) * 1.1);
 
@@ -363,16 +381,18 @@ export const ownsFullGroup = (properties: Property[], property: Property, ownerN
 };
 
 // Even-build: a property may only be raised when it is at the lowest level in its group (hotel = level 5).
-export const canBuildHouseOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+export const canBuildHouseOn = (properties: Property[], property: Property, ownerName: string, supplyLimits = false): boolean => {
   if (property.type !== 'property' || property.isMortgaged || property.isInactive || property.hasHotel) return false;
+  if (supplyLimits && housesInPlay(properties) >= HOUSE_SUPPLY) return false;
   if (property.owner !== ownerName || property.houses >= 4) return false;
   if (!ownsFullGroup(properties, property, ownerName)) return false;
   const minLevel = Math.min(...colorGroupOf(properties, property).map(buildLevel));
   return buildLevel(property) <= minLevel;
 };
 
-export const canBuildHotelOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+export const canBuildHotelOn = (properties: Property[], property: Property, ownerName: string, supplyLimits = false): boolean => {
   if (property.type !== 'property' || property.isMortgaged || property.isInactive || property.hasHotel) return false;
+  if (supplyLimits && hotelsInPlay(properties) >= HOTEL_SUPPLY) return false;
   if (property.owner !== ownerName || property.houses !== 4) return false;
   if (!ownsFullGroup(properties, property, ownerName)) return false;
   return Math.min(...colorGroupOf(properties, property).map(buildLevel)) >= 4;
@@ -407,13 +427,16 @@ export const resolvePendingCard = (state: GameState): GameState => {
   if (pc.isReward) {
     return { ...next, players: next.players.map(p => p.id === cp.id ? { ...p, balance: p.balance + amount } : p) };
   }
-  return applyPayment(next, cp.id, null, amount, label); // penalty can bankrupt
+  return applyPayment(next, cp.id, null, amount, label, { liquidate: true }); // penalty bankrupts only if assets can't cover it
 };
 
 // Apply payment and check bankruptcy.
 // Creditor only receives what the payer actually had. A bankrupt player's properties become neutral
 // inactive tiles (no rent, no purchase); their workers and pending trade offers are cleared.
-export const applyPayment = (state: GameState, fromId: string, toPlayerName: string | null, amount: number, reason: string): GameState => {
+export const applyPayment = (rawState: GameState, fromId: string, toPlayerName: string | null, amount: number, reason: string, opts?: { liquidate?: boolean }): GameState => {
+  let state = rawState;
+  const rawPayer = state.players.find(p => p.id === fromId);
+  if (opts?.liquidate && rawPayer && rawPayer.balance < amount) state = autoLiquidate(state, fromId, amount - rawPayer.balance);
   const payerIdx = state.players.findIndex(p => p.id === fromId);
   if (payerIdx === -1 || amount <= 0) return state;
   const payer = state.players[payerIdx];
@@ -431,6 +454,8 @@ export const applyPayment = (state: GameState, fromId: string, toPlayerName: str
   });
 
   let nextState: GameState = { ...state, players };
+  // Bank payments feed the Free Parking pot when that variant is on
+  if (!toPlayerName && state.settings.freeParkingPot && received > 0) nextState = { ...nextState, freeParkingPot: (state.freeParkingPot || 0) + received };
   if (goesBankrupt) {
     nextState = {
       ...nextState,
@@ -451,4 +476,37 @@ export const applyPayment = (state: GameState, fromId: string, toPlayerName: str
     nextState = addEvent(nextState, 'bankrupt', payer.name, `went bankrupt (${reason})`);
   }
   return checkWinCondition(nextState);
+};
+
+// Raise cash for a debt before bankruptcy: sell buildings (highest first, even-sell), then mortgage properties.
+// Used for forced settlements (timer expiry, tax, card penalties). A player who clicks "Declare bankruptcy"
+// skips this on purpose.
+export const autoLiquidate = (state: GameState, playerId: string, needed: number): GameState => {
+  const me = state.players.find(p => p.id === playerId);
+  if (!me || needed <= 0) return state;
+  let s = state;
+  let raised = 0;
+  for (let guard = 0; guard < 300 && raised < needed; guard++) {
+    const cand = s.properties
+      .filter(p => p.owner === me.name && canSellBuildingOn(s.properties, p, me.name))
+      .sort((a, b) => buildLevel(b) - buildLevel(a))[0];
+    if (!cand) break;
+    raised += cand.hasHotel ? Math.round((cand.hotelCost || 0) * 0.5) : Math.round((cand.houseCost || 0) * cand.houses * 0.5);
+    s = { ...s, properties: s.properties.map(p => p.id !== cand.id ? p : (cand.hasHotel ? { ...p, hasHotel: false, houses: 4 } : { ...p, houses: p.houses - 1 })) };
+  }
+  if (s.settings.mortgageEnabled !== false && raised < needed) {
+    const mortgageable = s.properties
+      .filter(p => p.owner === me.name && !p.isMortgaged && !p.isInactive && p.houses === 0 && !p.hasHotel && mortgagePayout(p) > 0)
+      .sort((a, b) => mortgagePayout(b) - mortgagePayout(a));
+    const ids = new Set<string>();
+    for (const p of mortgageable) {
+      if (raised >= needed) break;
+      raised += mortgagePayout(p);
+      ids.add(p.id);
+    }
+    if (ids.size) s = { ...s, properties: s.properties.map(p => ids.has(p.id) ? { ...p, isMortgaged: true } : p) };
+  }
+  if (raised <= 0) return state;
+  s = { ...s, players: s.players.map(p => p.id === playerId ? { ...p, balance: p.balance + raised } : p) };
+  return addEvent(s, 'mortgage', me.name, `liquidated assets to cover a debt (+$${raised.toLocaleString('en-US')})`, raised);
 };

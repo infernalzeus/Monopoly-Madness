@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Property, Player, GameEvent, DiceRoll, Worker } from '@/types/game';
@@ -103,6 +104,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
   const prevPosRef = useRef<Record<string, number>>({});
   // Keep scheduled timers so we can cancel on unmount or re-trigger
   const hopTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const reducedMotion = usePrefersReducedMotion();
 
   // Stable key built from each player's actual position — only recompute when positions change
   const posKey = players.map(p => `${p.id}:${p.position}`).join('|');
@@ -130,7 +132,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
       const steps = (next - prev + 40) % 40;
 
       // For teleports (Go to Jail, etc.) — > 12 steps — snap directly
-      if (steps === 0 || steps > 12) {
+      if (steps === 0 || steps > 12 || reducedMotion) {
         setDisplayPositions(d => ({ ...d, [player.id]: next }));
         setIsMoving(m => ({ ...m, [player.id]: true }));
         const t = setTimeout(() => setIsMoving(m => ({ ...m, [player.id]: false })), 400);

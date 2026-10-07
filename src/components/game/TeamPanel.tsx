@@ -12,9 +12,11 @@ interface TeamPanelProps {
   players?: Player[];
   onJoinTeam: (teamId: string) => void;
   onCreateTeam: (teamName: string) => void;
+  /** Alliances are fixed after the first round */
+  locked?: boolean;
 }
 
-const TeamPanel: React.FC<TeamPanelProps> = ({ currentPlayer, teams, players = [], onJoinTeam, onCreateTeam }) => {
+const TeamPanel: React.FC<TeamPanelProps> = ({ currentPlayer, teams, players = [], onJoinTeam, onCreateTeam, locked = false }) => {
   const [newTeamName, setNewTeamName] = useState('');
   const playerTeam = teams.find(t => t.members.includes(currentPlayer.id));
 
@@ -27,7 +29,9 @@ const TeamPanel: React.FC<TeamPanelProps> = ({ currentPlayer, teams, players = [
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!playerTeam ? (
+        {locked && !playerTeam ? (
+          <p className="text-xs text-indigo-300/80 bg-indigo-500/10 p-2 rounded border border-indigo-500/20">Alliances are locked — teams can only be formed during the first round.</p>
+        ) : !playerTeam ? (
           <div className="space-y-4">
             <p className="text-xs text-indigo-300/70 bg-indigo-500/10 p-2 rounded border border-indigo-500/20">
               Team up to share monopoly color bonuses! Each player keeps their own turn and balance, but color groups count across teammates.

@@ -135,12 +135,13 @@ const RulesPanel: React.FC<RulesPanelProps> = ({ settings, onClose }) => {
           )}
 
           <Section title="Bankruptcy & Winning" emoji="🏆">
-            <Rule>If your balance drops below zero, you're bankrupt. All your properties transfer to your creditor (or return to the bank).</Rule>
+            <Rule>If a payment can't be covered, you're bankrupt. Forced payments (tax, cards, a timed-out rent) first sell buildings and mortgage properties automatically; you can also mortgage/sell yourself, or declare bankruptcy.</Rule>
+            <Rule>A bankrupt player's properties become <strong className="text-slate-300">neutral tiles</strong> — no rent, no purchase. Rent still pending to a player who just went out is waived. You can keep watching as a spectator.</Rule>
             <Rule>The last active player standing wins the game!</Rule>
           </Section>
 
           <p className="text-xs text-slate-500 text-center pt-2 border-t border-slate-700">
-            Click anywhere outside this panel to close · Monopoly Madness v1.1.3
+            Click anywhere outside this panel to close · Monopoly Madness v1.1.9
           </p>
         </div>
       </div>

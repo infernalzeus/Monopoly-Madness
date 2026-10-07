@@ -30,6 +30,7 @@ const react = {
 const hook = load('src/hooks/useGameLogic.ts', {
   react,
   '../lib/firebase': { db: {} },
+  '../lib/clock': load('src/lib/clock.ts'),
   'firebase/firestore': {},
   '../gameEngine/core': core
 });
@@ -171,5 +172,65 @@ test('stale trade ownership is cancelled', () => {
   s.tradeOffers = [{ id: 't', fromPlayer: 'You', toPlayer: 'Alice', offeredProperties: ['prop-1'], requestedProperties: [], offeredCash: 0, requestedCash: 0, status: 'pending', expiresAt: Date.now() + 10000 }];
   const a = actions(s, 'player-2'); a.acceptTradeOffer('t', 'Alice'); assert.equal(slots[0].tradeOffers[0].status, 'rejected');
 });
+
+// ---- v1.1.9 features ----
+test('decline with auctions on starts a bank auction', () => {
+  const s = fixture(); s.settings.auctionsEnabled = true; s.turnState = 'waiting_for_action';
+  s.pendingPurchase = { propertyId: 'prop-1', playerId: 'player-1' };
+  const a = actions(s); a.skipPurchase();
+  assert.ok(slots[0].currentAuction); assert.equal(slots[0].currentAuction.startedBy, null); assert.equal(slots[0].pendingPurchase, null);
+});
+test('decline with auctions off just passes', () => {
+  const s = fixture(); s.settings.auctionsEnabled = false; s.pendingPurchase = { propertyId: 'prop-1', playerId: 'player-1' };
+  const a = actions(s); a.skipPurchase(); assert.equal(slots[0].currentAuction, null); assert.equal(slots[0].turnState, 'completed');
+});
+test('seller start bid below 10% of value is rejected', () => {
+  const s = fixture(); s.settings.auctionsEnabled = true; s.pendingPurchase = { propertyId: 'prop-1', playerId: 'player-1' };
+  const v = s.properties[1].currentValue; const a = actions(s); a.startAuction('prop-1', 'You', Math.round(v * 0.05));
+  assert.equal(slots[0].currentAuction, null);
+});
+test('forced payment liquidates (sell buildings, then mortgage) before bankruptcy', () => {
+  const s = fixture(2); s.players[0].balance = 0;
+  const g = s.properties.filter(p => p.colorGroup === 'brown'); g.forEach(p => { p.owner = 'You'; p.isOwned = true; });
+  g[0].houses = 2; g[1].houses = 2;
+  const need = 40000; const n = core.applyPayment(s, 'player-1', null, need, 'Tax', { liquidate: true });
+  assert.equal(n.players[0].isActive, true); assert.ok(n.players[0].balance >= 0);
+  const hard = core.applyPayment(s, 'player-1', null, need, 'Declare');
+  assert.equal(hard.players[0].isActive, false);
+});
+test('rent owed to a player who went out is waived', () => {
+  const s = fixture(); s.pendingRent = { propertyId: 'prop-1', owner: 'Alice', amount: 100 }; s.players[1].isActive = false;
+  const n = core.advanceTurn(s); assert.equal(n.players[0].balance, s.players[0].balance);
+  const a = actions({ ...s, turnState: 'waiting_for_action' }); a.payRent(); assert.equal(slots[0].pendingRent, null);
+  assert.equal(slots[0].players[0].balance, s.players[0].balance);
+});
+test('free parking pot collects bank payments and pays out on landing', () => {
+  let s = fixture(2); s.settings.freeParkingPot = true; s.freeParkingPot = 0;
+  s = core.applyPayment(s, 'player-1', null, 500, 'Tax'); assert.equal(s.freeParkingPot, 500);
+  s.players[1].position = 15; s.currentPlayer = 'player-2'; s.lastDiceRoll = dice(2, 3); const bal = s.players[1].balance;
+  const n = core.movePlayer(s, 5); assert.equal(n.freeParkingPot, 0); assert.equal(n.players[1].balance, bal + 500);
+});
+test('supply limits stop house and hotel construction', () => {
+  const s = fixture(); const g = s.properties.filter(p => p.colorGroup === 'brown'); g.forEach(p => { p.owner = 'You'; p.isOwned = true; });
+  assert.equal(core.canBuildHouseOn(s.properties, g[0], 'You', true), true);
+  s.properties.filter(p => p.type === 'property' && p.colorGroup !== 'brown').slice(0, 8).forEach(p => { p.houses = 4; });
+  assert.equal(core.housesInPlay(s.properties), 32);
+  assert.equal(core.canBuildHouseOn(s.properties, g[0], 'You', true), false);
+  assert.equal(core.canBuildHouseOn(s.properties, g[0], 'You', false), true);
+});
+test('alliances lock after the first round', () => {
+  const s = fixture(); s.settings.teamsEnabled = true; s.turn = 0;
+  let a = actions(s); a.createTeam('Red'); assert.equal(slots[0].teams.length, 1);
+  const s2 = fixture(); s2.settings.teamsEnabled = true; s2.turn = 10;
+  a = actions(s2); a.createTeam('Late'); assert.equal(slots[0].teams.length, 0);
+});
+test('rematch resets the game for the host only', () => {
+  const s = fixture(); s.gamePhase = 'ended'; s.winnerId = 'player-1'; s.players[1].balance = 5; s.properties[1].owner = 'Alice'; s.properties[1].isOwned = true;
+  let a = actions(s, 'player-2'); a.rematch(); assert.equal(slots[0].gamePhase, 'ended');
+  a = actions(s, 'player-1'); a.rematch();
+  assert.equal(slots[0].gamePhase, 'setup'); assert.equal(slots[0].winnerId, null);
+  assert.equal(slots[0].players[1].balance, s.settings.startingBalance); assert.equal(slots[0].properties[1].isOwned, false);
+});
+
 console.log(`RESULT ${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

@@ -98,6 +98,8 @@ export interface GameSettings {
   turnTimerDuration?: number; // In seconds
   singlePlayer?: boolean; // 1-player vs Bot Noob mode
   workersEnabled?: boolean; // Auto house-builders that activate on GO
+  freeParkingPot?: boolean; // taxes / card penalties / jail fines accumulate; landing on Free Parking collects
+  supplyLimits?: boolean;   // classic limits: 32 houses and 12 hotels in the whole game
 }
 
 export interface Worker {
@@ -156,6 +158,7 @@ export interface GameState {
   turnEndTime?: number | null;
   pendingCard?: PendingCard | null;
   workers?: Worker[];
+  freeParkingPot?: number;
 }
 
 export interface TradeOffer {

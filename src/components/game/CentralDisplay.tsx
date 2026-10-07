@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { GameEvent, DiceRoll } from '@/types/game';
 import { formatSignedMoney, readableTextOn } from '@/lib/utils';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 interface CentralDisplayProps {
   currentEvent: GameEvent | null;
@@ -86,10 +87,11 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
   // Animated dice values while rolling
   const [animDice, setAnimDice] = useState<[number, number]>([1, 1]);
   const rollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   // Cycle dice faces rapidly while rolling
   useEffect(() => {
-    if (isRolling) {
+    if (isRolling && !reducedMotion) {
       rollInterval.current = setInterval(() => {
         setAnimDice([
           Math.ceil(Math.random() * 6),
@@ -107,7 +109,7 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
     return () => {
       if (rollInterval.current) clearInterval(rollInterval.current);
     };
-  }, [isRolling, lastDiceRoll]);
+  }, [isRolling, lastDiceRoll, reducedMotion]);
 
   const getEventIcon = (type: GameEvent['type']) => {
     switch (type) {

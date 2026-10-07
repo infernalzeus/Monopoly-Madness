@@ -104,14 +104,15 @@ const LobbySystem: React.FC<LobbySystemProps> = ({ onCreateLobby, onJoinLobby })
         }
         
         // Auto-delete if game ended OR hasn't been updated for 10 minutes
-        if (isActuallyEnded || lastUpdated < deleteThreshold) {
+        if ((isActuallyEnded && lastUpdated < now - 3600000) || (!isActuallyEnded && lastUpdated < deleteThreshold)) {
           staleIds.push(docSnap.id);
         }
       });
 
       setActiveGames(visibleGames);
       
-      // Perform automatic cleanup of stale/ended games
+      // Perform automatic cleanup of stale/ended games (ended rooms linger for an hour so the result card + rematch stay usable;
+      // only the host's browser is allowed to delete by the Firestore rules, others fail silently)
       if (staleIds.length > 0) {
         staleIds.forEach(async (id) => {
           try {
@@ -224,7 +225,7 @@ const LobbySystem: React.FC<LobbySystemProps> = ({ onCreateLobby, onJoinLobby })
           <p className="text-sm text-cyan-400/70 mb-5">
             Buy, bid at auction, build with workers, team up with friends — or take on Bot Noob solo. Last millionaire standing wins!
           </p>
-          <p className="text-xs text-cyan-400/40 font-mono tracking-wider mb-6">v1.1.8</p>
+          <p className="text-xs text-cyan-400/40 font-mono tracking-wider mb-6">v1.1.9</p>
           {/* Feature highlight pills */}
           <div className="flex flex-wrap justify-center gap-2 mb-2">
             {[
@@ -610,6 +611,22 @@ const LobbySystem: React.FC<LobbySystemProps> = ({ onCreateLobby, onJoinLobby })
                           setLobbySettings(prev => ({ ...prev, blindPickEnabled: checked }))
                         }
                       />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-cyan-400/30">
+                      <div>
+                        <Label className="text-cyan-200 font-semibold">Free Parking pot</Label>
+                        <p className="text-xs text-slate-400">Taxes, card penalties and jail fines go into a pot; landing on Free Parking collects it</p>
+                      </div>
+                      <Switch checked={!!lobbySettings.freeParkingPot} onCheckedChange={(checked) => setLobbySettings(prev => ({ ...prev, freeParkingPot: checked }))} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-cyan-400/30">
+                      <div>
+                        <Label className="text-cyan-200 font-semibold">Building supply limits</Label>
+                        <p className="text-xs text-slate-400">Classic scarcity: only 32 houses and 12 hotels exist in the whole game</p>
+                      </div>
+                      <Switch checked={!!lobbySettings.supplyLimits} onCheckedChange={(checked) => setLobbySettings(prev => ({ ...prev, supplyLimits: checked }))} />
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-cyan-400/30">

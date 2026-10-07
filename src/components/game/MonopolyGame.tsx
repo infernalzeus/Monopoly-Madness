@@ -15,8 +15,9 @@ import RentPaymentDialog from './RentPaymentDialog';
 import GameLog from './GameLog';
 import TeamPanel from './TeamPanel';
 import { db, authReady, currentUid } from '@/lib/firebase';
+import { setClockOffset } from '@/lib/clock';
 import { readableTextOn } from '@/lib/utils';
-import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
 import { useToast } from '@/hooks/use-toast';
@@ -116,7 +117,8 @@ const MonopolyGame: React.FC = () => {
     assignWorker,
     removeWorker,
     updateWorkerColor,
-    canBuildHouse
+    canBuildHouse,
+    rematch
   } = useGameLogic(!showLobby ? lobbyCode : undefined, localPlayerId);
 
   const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
@@ -437,13 +439,27 @@ const MonopolyGame: React.FC = () => {
   }, [isLobbyOwner, lobbyCode]);
 
   // Subscribe to playerPresence field (stored at doc root, outside gameState)
+  // The same listener estimates this browser's clock offset from a Firestore server timestamp ("clock probe")
+  // so turn and auction timers count down to the same instant on every device.
+  const lastProbeMs = React.useRef<number | null>(null);
   useEffect(() => {
     if (!lobbyCode || showLobby) return;
     const roomRef = doc(db, 'games', lobbyCode);
+    const uid = currentUid();
     const unsub = onSnapshot(roomRef, snap => {
-      if (snap.exists()) setPlayerPresence(snap.data().playerPresence || {});
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setPlayerPresence(data.playerPresence || {});
+      const probe = uid ? data.clockProbe?.[uid] : null;
+      if (!snap.metadata.hasPendingWrites && probe?.toMillis) {
+        const ms = probe.toMillis();
+        if (ms !== lastProbeMs.current) { lastProbeMs.current = ms; setClockOffset(ms - Date.now()); }
+      }
     });
-    return () => unsub();
+    const sendProbe = () => { if (uid) updateDoc(roomRef, { [`clockProbe.${uid}`]: serverTimestamp() }).catch(() => {}); };
+    sendProbe();
+    const probeTimer = setInterval(sendProbe, 5 * 60 * 1000);
+    return () => { unsub(); clearInterval(probeTimer); };
   }, [lobbyCode, showLobby]);
 
   // Heartbeat: every player updates their own presence entry every 20 seconds
@@ -585,16 +601,6 @@ const MonopolyGame: React.FC = () => {
     startAuction(propertyId);
   };
 
-  const handleSellProperty = (propertyId: string, amount: number) => {
-    // Implementation for selling property to other players or bank
-    console.log(`Selling property ${propertyId} for $${amount}`);
-  };
-
-  const handleTradeOffer = (toPlayer: string, offeredProps: string[], requestedProps: string[]) => {
-    // Implementation for trading properties
-    console.log('Trade offer:', { toPlayer, offeredProps, requestedProps });
-  };
-
   const handleCreateLobby = async (settings: GameSettings, code: string, playerName: string, color?: string, icon?: string) => {
     try {
       const roomRef = doc(db, 'games', code);
@@ -659,6 +665,7 @@ const MonopolyGame: React.FC = () => {
         status: settings.singlePlayer ? 'playing' : 'waiting',
         hostName: playerName,
         hostUid: currentUid() || null,
+        members: currentUid() ? { [currentUid() as string]: true } : {},
         lastUpdated: Date.now(),
         playerCount: players.length
       });
@@ -697,12 +704,14 @@ const MonopolyGame: React.FC = () => {
               ? { ...p, uid: p.uid || myUid, color: color || p.color, pieceIcon: icon || p.pieceIcon }
               : p
           );
-          tx.update(roomRef, { gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now() });
+          tx.update(roomRef, { gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now(), ...(myUid ? { [`members.${myUid}`]: true } : {}) });
           return { id: existingPlayer.id, host: !!myUid && data.hostUid === myUid };
         }
 
-        if (state.players.length >= state.settings.maxPlayers) return { error: 'Lobby is currently full!' };
-        if (state.gamePhase !== 'setup') return { error: 'That game has already started.' };
+        const lateJoin = state.gamePhase !== 'setup';
+        // Joining a running game is allowed as a spectator (watch only; never takes a turn or counts as a survivor)
+        if (!lateJoin && state.players.length >= state.settings.maxPlayers) return { error: 'Lobby is currently full!' };
+        if (state.gamePhase === 'ended') return { error: 'That game has ended.' };
 
         // Highest existing id + 1 (length + 1 collides after a player is removed)
         const maxId = state.players.reduce((m, p) => Math.max(m, parseInt(p.id.replace('player-', ''), 10) || 0), 0);
@@ -712,7 +721,8 @@ const MonopolyGame: React.FC = () => {
         const newPlayer: Player = {
           id: joinedPlayerId,
           name: playerName || `Player ${state.players.length + 1}`,
-          balance: state.settings.startingBalance || 1500000,
+          balance: lateJoin ? 0 : (state.settings.startingBalance || 1500000),
+          isSpectator: lateJoin || undefined,
           properties: [],
           position: 0,
           color: color || colors[state.players.length] || '#000',
@@ -727,7 +737,7 @@ const MonopolyGame: React.FC = () => {
         const next: GameState = { ...state, players: [...state.players, newPlayer] };
         // Auto-start when the lobby fills. With auctions on this enters the draft; the host's client
         // drives it (and falls through to normal play when no draft properties were chosen).
-        if (next.players.length === next.settings.maxPlayers) {
+        if (!lateJoin && next.players.length === next.settings.maxPlayers) {
           if (next.settings.auctionsEnabled) {
             next.preAuctionPhase = true;
             next.gamePhase = 'auction';
@@ -740,7 +750,8 @@ const MonopolyGame: React.FC = () => {
         }
         tx.update(roomRef, {
           gameState: next, lastUpdated: Date.now(), playerCount: next.players.length,
-          status: next.gamePhase === 'setup' ? 'waiting' : 'playing'
+          status: next.gamePhase === 'setup' ? 'waiting' : 'playing',
+          ...(myUid ? { [`members.${myUid}`]: true } : {})
         });
         return { id: joinedPlayerId };
       });
@@ -891,6 +902,9 @@ const MonopolyGame: React.FC = () => {
               </ol>
               <div className="flex gap-3">
                 <button onClick={() => setWinnerDismissed(true)} className="flex-1 min-h-[44px] rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold text-sm">View board</button>
+                {isLobbyOwner && (
+                  <button onClick={() => { setWinnerDismissed(false); rematch(); }} className="flex-1 min-h-[44px] rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm">Rematch</button>
+                )}
                 <button onClick={() => { window.location.href = window.location.pathname; }} className="flex-1 min-h-[44px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm">Back to lobby</button>
               </div>
             </div>
@@ -1243,8 +1257,6 @@ const MonopolyGame: React.FC = () => {
                 workersEnabled={gameState.settings.workersEnabled}
                 onMortgage={mortgageProperty}
                 onUnmortgage={unmortgageProperty}
-                onSell={handleSellProperty}
-                onTrade={handleTradeOffer}
               />
 
               {/* Team Panel - Only visible if teams enabled */}
@@ -1255,6 +1267,7 @@ const MonopolyGame: React.FC = () => {
                   players={gameState.players}
                   onJoinTeam={joinTeam}
                   onCreateTeam={createTeam}
+                  locked={gameState.turn >= gameState.players.length}
                 />
               )}
             </div>

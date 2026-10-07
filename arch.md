@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.8`**  
+> **Current Version: `v1.1.9`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,16 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.9 — Rule decisions + remaining features
+
+**Decisions made (change in the named place if you disagree):** **A10** declining a property with auctions on → automatic **bank auction** (`skipPurchase`); the seller "Start auction" path (custom bid, proceeds to seller) still exists · **A11** seller start bid floor = 10% of market value (default 70%), enforced in `startAuction` · **A13** bankrupt tiles stay **neutral tiles** (historical owner kept, no rent/purchase); RulesPanel now says so · **A14** rent pending to a player who has since gone out is **waived** · **Teams** can only be formed in the first round (`turn < players.length`), TeamPanel shows the lock.
+
+**New:** **Auto-liquidation** (`autoLiquidate`, `applyPayment(..., {liquidate:true})`): tax, card penalties and a timed-out rent first sell buildings (highest first, even-sell) then mortgage; an explicit *Declare bankruptcy* skips it · **Free Parking pot** (lobby toggle `freeParkingPot`; bank payments incl. jail fines feed `GameState.freeParkingPot`, landing collects) · **Supply limits** (toggle `supplyLimits`: 32 houses / 12 hotels, enforced for humans and workers) · **Spectators**: joining a running game adds a watch-only seat (`isSpectator`) · **Rematch** (host, after game over: same seats, fresh game, back to setup) · ended rooms linger 1 h before cleanup · pending trade offers capped at 5 per sender · **Server-clock estimate**: `lib/clock.ts` `serverNow()`; a Firestore `serverTimestamp()` probe per client sets the offset, every timer uses it · **Room membership**: `members.{uid}` on the room doc; `firestore.rules` now lets only seated uids update (a joiner may add exactly their own uid) · JS dice/hop animations honour reduced motion · dead `onSell`/`onTrade` stubs removed.
+
+Still open: **A02** (a seated player can still write any state — needs a server/Cloud Functions), supply-limit rule for selling a hotel back to 4 houses, interactive playtest (`PLAYTEST_PROMPT.md`), the UI-kit redesign (`UI_KIT_PROMPT.md`) and wiring it in.
 
 ---
 

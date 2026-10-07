@@ -178,8 +178,6 @@ interface PlayerPanelProps {
   workers?: Worker[];
   onMortgage: (propertyId: string) => void;
   onUnmortgage?: (propertyId: string) => void;
-  onSell: (propertyId: string, amount: number) => void;
-  onTrade: (toPlayer: string, offeredProps: string[], requestedProps: string[]) => void;
   workersEnabled?: boolean;
 }
 
@@ -190,8 +188,6 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   workers = [],
   onMortgage,
   onUnmortgage,
-  onSell,
-  onTrade,
   workersEnabled = false,
 }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
