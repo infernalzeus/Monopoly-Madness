@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, type Auth, type User } from 'firebase/auth';
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -13,16 +13,20 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-const app = initializeApp(firebaseConfig);
+// A deployment without the VITE_FIREBASE_* variables used to crash at import time and render a blank page
+// (auth/invalid-api-key). Now the app still loads and shows a clear "not configured" screen (see main.tsx).
+export const firebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
+const app = firebaseConfigured ? initializeApp(firebaseConfig) : null;
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+export const db = (app ? getFirestore(app) : null) as unknown as Firestore;
+export const auth = (app ? getAuth(app) : null) as unknown as Auth;
+export const analytics = app && typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Anonymous sign-in gives every browser a stable uid (persisted by Firebase) which seats are bound to,
 // and lets firestore.rules require `request.auth != null`. If the Anonymous provider is not enabled in the
 // Firebase console this resolves to null and the app keeps working while the rules are still open.
 export const authReady: Promise<User | null> = new Promise(resolve => {
+  if (!app) { resolve(null); return; }
   const unsub = onAuthStateChanged(auth, user => {
     if (user) { unsub(); resolve(user); }
   });
@@ -31,4 +35,4 @@ export const authReady: Promise<User | null> = new Promise(resolve => {
     resolve(null);
   });
 });
-export const currentUid = (): string | null => auth.currentUser?.uid ?? null;
+export const currentUid = (): string | null => auth?.currentUser?.uid ?? null;
