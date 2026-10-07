@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.3`**  
+> **Current Version: `v1.1.5`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,51 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.5 — Rules-Engine Audit Fixes (auction / trade / bankruptcy / draft)
+
+Root cause theme: several flows lived only in React callbacks reading a *stale client copy* of state, so
+multiplayer races and modded settings (auctions, trading, workers, mortgage) could corrupt the game.
+All the fixes below validate against the **live transaction state** and share one rules module (`core.ts`).
+
+| Area | Bug | Fix |
+|---|---|---|
+| **Auction draft (auctionsEnabled)** | Game entered `gamePhase:'auction'` and **never left it** — nothing drove the draft (`PreAuctionPanel` is not mounted), and turn auto-advance / turn timer / bots / jail dialog are all gated on `'playing'`. Every auction-mode game was half-broken. | `nextDraftStep()` in `useGameLogic.ts`: host client auctions each `settings.preAuctionProperties` entry in turn (consumed from the queue so unsold ones aren't retried), then flips to `'playing'` with player 1 first. No draft properties → straight to play. `startPreAuction` no longer requires `gameMode==='auction'`. Draft auctions don't consume a turn. |
+| **Auction vs turn timer** | 60 s turn timer < 120 s auction → turn advanced mid-auction, then `endAuction` advanced again → a player was skipped. | Turn clock paused while `currentAuction` exists (`startAuction` nulls `turnEndTime`, auction end restarts it); `advanceTurn` is a no-op during an auction. |
+| **Stale auction timer** | A client's `auctionTimer` stayed `0` after an auction; the next auction was ended instantly with no bids. | Countdown derived from `endTimestamp` in an effect that resets to `null` when no auction; `resolveAuction` rejects calls before `endTimestamp − 1.5 s`. The seller's "Collect" button uses `endAuctionNow` (forced). |
+| **Bid races** | `placeBid` checked a stale balance/bid client-side; a lower bid could overwrite a higher one. | Re-validated inside the transaction: bidder active, balance, not already winning, `amount > currentBid` (first bid `>=` start), auction still open. |
+| **Winner can't pay** | Winner's balance could go negative if they spent money during the auction. | `resolveAuction` checks the winner can still pay; otherwise "went unsold". |
+| **Rent bankruptcy** | `payRent` just subtracted — balance went negative, player stayed in. Timer expiry **dodged rent entirely**. | `payRent` → engine `applyPayment` (bankruptcy). `advanceTurn` (`core.ts`) now `settlePending()`s rent / card before moving on. Rent dialog offers *Declare Bankruptcy* when unaffordable. |
+| **Card penalty** | Could push balance negative without bankruptcy. | `resolvePendingCard()` (core) uses `applyPayment`. |
+| **Bankruptcy consistency** | Two divergent implementations (hook transferred assets to creditor; core made them neutral tiles); creditor received money the payer didn't have. | Single `applyPayment` in core: creditor gets only available cash; assets → neutral inactive tiles (buildings cleared); workers removed; pending trades rejected; `bankrupt` event. Dead hook copy + dead `drawCard`/decks deleted. |
+| **Trades** | `acceptTradeOffer` moved properties with no ownership/balance/expiry checks → could steal a property that had since been traded elsewhere, create negative cash, or duplicate ids. Offers were attributed to *current turn player* not the sender. | Full re-validation in the transaction (ownership, not in auction, both active, cash, expiry); invalid offers auto-cancelled with a log line; other pending offers touching moved properties are rejected; workers on moved properties removed; `tradingEnabled` enforced; resolved offers capped. |
+| **Building rules** | Hotel counted as level 0 so one hotel froze building in the group; `sellHouse/sellHotel/buildHotel` had no ownership/monopoly check (could sell/build on **opponents'** properties); sell refund ignored progressive cost; mortgage allowed with buildings; `mortgageEnabled` ignored. | Rules centralised in `core.ts` (`buildLevel`, `canBuildHouseOn`, `canBuildHotelOn`, `canSellBuildingOn`, `mortgagePayout`, `unmortgageCost`); even-build/even-sell with hotel = level 5; every action validated in-transaction for the acting player. |
+| **Join race** | `handleJoinLobby` was read-modify-write: two simultaneous joins overwrote each other and `player-${length+1}` collided after a removal. | Runs in `runTransaction`; id = max+1; rejects joins after start. Host remove-player also transactional. |
+| **Misc** | Dice could be rolled outside `'playing'`; duplicate turn advances (timer + auto-advance + bot); disconnected current player stalled the table. | `advanceTurn(expectTurn)` is idempotent; any client takes over an expired turn after a 5 s grace; roll gated on phase. |
+
+### Known gaps (open — see `AUDIT_PROMPT.md`)
+Doubles / extra roll, team-mode win condition and shared-monopoly rent, out-of-jail cards, trading buildings,
+client-clock authority (use Firestore `serverTimestamp`), name-based identity (reconnect-by-name impersonation),
+open Firestore rules, no automated tests beyond `core.ts` scenario checks.
+
+---
+
+## 🔧 v1.1.4 — Turn-Timer & Multiplayer Bug Fixes
+
+### Summary of all changes in this version
+
+| Area | Change |
+|---|---|
+| **Version** | Bumped to v1.1.4 across lobby byline and arch.md |
+| **Stale `turnEndTime` (root cause fix)** | Added `withFreshTimer()` helper in `useGameLogic.ts`. Every path that calls `advanceTurnLogic()` directly (`purchaseProperty`, `resolveCard`, `endAuction`) now also resets `turnEndTime` for the incoming player. Previously the new player inherited the PREVIOUS player's (possibly expired) timer epoch, causing the new turn to be immediately skipped by the timer effect. |
+| **Auction end race condition** | `endAuction` now merges property transfer + turn advance into a single `setGameState` transaction. The existing `if (!prev.currentAuction) return prev` guard ensures only the first client to write wins; subsequent clients are no-ops. Removed the separate `advanceTurn()` call that all clients were firing independently. |
+| **Turn timer initialization** | `turnEndTime` is now set on game start for both paths: single-player (`handleCreateLobby`) and multiplayer auto-start (`handleJoinLobby`). First turn now always has a countdown. |
+| **Host "Start Game Now" button** | Setup screen now shows a green "🚀 Start Game Now (N players)" button for the host when ≥ 2 players have joined, eliminating the requirement to fill all `maxPlayers` slots before the game can begin. Fixes Workers mode and any scenario where the host wants to start early. |
+| **Timer visible during jail/card dialogs** | Turn timer badge now appears inside the Jail dialog header and the Chance/Community Chest card dialog header (right-aligned). Previously the z-50 board overlay covered `CentralDisplay` which was the only place the timer rendered. |
+| **Purchase overlay scoped to current player** | Board overlay (z-50) is no longer triggered for non-current players by `pendingPurchaseData`. Non-current players see the board normally while someone else is deciding to buy. Auctions still show to all players. |
+| **Player presence in lobby** | Each player now sends a heartbeat to `playerPresence.{playerId}` in Firestore every 20 seconds. Setup screen shows "⚠️ Away" badge for players silent > 45 s. Host can click ✕ to remove an away player. |
 
 ---
 

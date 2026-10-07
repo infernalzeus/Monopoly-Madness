@@ -90,7 +90,7 @@ export const ACHIEVEMENTS: Achievement[] = [
 ];
 
 export interface AchievementProperty {
-  owner: string;
+  owner?: string;
   colorGroup?: string;
   type: string;
   houses: number;

@@ -156,15 +156,14 @@ const RentPaymentDialog: React.FC<RentPaymentDialogProps> = ({
         <div className="flex gap-3">
           <Button
             onClick={onPayRent}
-            disabled={!canAfford}
             className={`flex-1 ${
               canAfford 
                 ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-red-700 hover:bg-red-800 text-white'
             }`}
           >
             <CreditCard className="w-4 h-4 mr-2" />
-            Pay Rent
+            {canAfford ? 'Pay Rent' : 'Declare Bankruptcy'}
           </Button>
           
           <Button
@@ -181,7 +180,7 @@ const RentPaymentDialog: React.FC<RentPaymentDialogProps> = ({
           <div className="bg-red-100 border border-red-300 rounded-lg p-3">
             <div className="text-sm text-red-800">
               <strong>Bankruptcy Warning:</strong> You cannot afford the rent! 
-              You may need to mortgage properties or declare bankruptcy.
+              Mortgage or sell buildings first, or declare bankruptcy — your properties become neutral tiles.
             </div>
           </div>
         )}

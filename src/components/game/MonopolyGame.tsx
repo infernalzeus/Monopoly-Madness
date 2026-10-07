@@ -15,7 +15,7 @@ import RentPaymentDialog from './RentPaymentDialog';
 import GameLog from './GameLog';
 import TeamPanel from './TeamPanel';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
 import { useToast } from '@/hooks/use-toast';
@@ -59,6 +59,8 @@ const MonopolyGame: React.FC = () => {
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
   // Local flag to immediately hide the card dialog on click (Firestore update is async)
   const [cardResolved, setCardResolved] = useState(false);
+  // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
+  const [playerPresence, setPlayerPresence] = useState<Record<string, number>>({});
   const { toast } = useToast();
   
   const {
@@ -69,7 +71,7 @@ const MonopolyGame: React.FC = () => {
     randomizeProperties,
     startAuction,
     placeBid,
-    endAuction,
+    endAuctionNow,
     purchaseProperty,
     skipPurchase,
     makeOffer,
@@ -227,7 +229,7 @@ const MonopolyGame: React.FC = () => {
   // Bot Noob bids on live auctions (independent of whose turn it is)
   useEffect(() => {
     const botPlayer = gameState.players.find(p => p.isBot);
-    if (!botPlayer || !gameState.currentAuction || gameState.gamePhase !== 'playing') return;
+    if (!botPlayer || !gameState.currentAuction || (gameState.gamePhase !== 'playing' && gameState.gamePhase !== 'auction')) return;
 
     const auction = gameState.currentAuction;
     // Bot doesn't bid on its own auction
@@ -441,6 +443,41 @@ const MonopolyGame: React.FC = () => {
     };
   }, [isLobbyOwner, lobbyCode]);
 
+  // Subscribe to playerPresence field (stored at doc root, outside gameState)
+  useEffect(() => {
+    if (!lobbyCode || showLobby) return;
+    const roomRef = doc(db, 'games', lobbyCode);
+    const unsub = onSnapshot(roomRef, snap => {
+      if (snap.exists()) setPlayerPresence(snap.data().playerPresence || {});
+    });
+    return () => unsub();
+  }, [lobbyCode, showLobby]);
+
+  // Heartbeat: every player updates their own presence entry every 20 seconds
+  useEffect(() => {
+    if (!lobbyCode || showLobby || !localPlayerId) return;
+    const roomRef = doc(db, 'games', lobbyCode);
+    const ping = () => updateDoc(roomRef, { [`playerPresence.${localPlayerId}`]: Date.now() }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 20000);
+    return () => clearInterval(interval);
+  }, [lobbyCode, showLobby, localPlayerId]);
+
+  // Remove a player from the lobby (host only, setup phase)
+  const removePlayerFromLobby = async (playerId: string) => {
+    if (!isLobbyOwner || !lobbyCode) return;
+    try {
+      const roomRef = doc(db, 'games', lobbyCode);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(roomRef);
+        if (!snap.exists()) return;
+        const st = snap.data().gameState as GameState;
+        const updated = { ...st, players: st.players.filter(p => p.id !== playerId) };
+        tx.update(roomRef, { gameState: updated, playerCount: updated.players.length, lastUpdated: Date.now() });
+      });
+    } catch (e) { console.error('Failed to remove player:', e); }
+  };
+
   // Manage current display event with 1-second timer
   useEffect(() => {
     if (gameState.gameEvents.length > 0) {
@@ -594,6 +631,10 @@ const MonopolyGame: React.FC = () => {
          workers: [],
          pendingCard: null,
          gamePhase: settings.singlePlayer ? 'playing' : 'setup',
+         // Initialize the turn timer immediately for single-player so the first turn has a countdown
+         turnEndTime: (settings.singlePlayer && settings.turnTimerDuration && settings.turnTimerDuration > 0)
+           ? Date.now() + (settings.turnTimerDuration * 1000)
+           : null,
          settings: {
            ...initialState.settings,
            ...settings,
@@ -622,71 +663,73 @@ const MonopolyGame: React.FC = () => {
   const handleJoinLobby = async (code: string, playerName: string, color?: string, icon?: string) => {
     try {
       const roomRef = doc(db, 'games', code);
-      const snap = await getDoc(roomRef);
-      if (snap.exists()) {
+      // One transaction: simultaneous joins can no longer overwrite each other or share a player id
+      const result = await runTransaction(db, async (tx): Promise<{ id: string } | { error: string }> => {
+        const snap = await tx.get(roomRef);
+        if (!snap.exists()) return { error: 'Room not found! Please check the code and try again.' };
         const data = snap.data();
         const state = data.gameState as GameState;
-        
-        let joinedPlayerId = '';
+
         const existingPlayer = state.players.find(p => p.name === playerName);
         if (existingPlayer) {
           // Reconnect: restore identity, apply any newly-selected token color/icon
-          joinedPlayerId = existingPlayer.id;
           const updatedPlayers = state.players.map(p =>
             p.id === existingPlayer.id
-              ? { ...p, color: color || p.color, pieceIcon: icon || p.pieceIcon, isActive: true }
+              ? { ...p, color: color || p.color, pieceIcon: icon || p.pieceIcon, isActive: p.isActive }
               : p
           );
-          await setDoc(roomRef, { ...data, gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now() });
-        } else {
-          if (state.players.length >= state.settings.maxPlayers) {
-            alert('Lobby is currently full!');
-            return;
-          }
-          
-          joinedPlayerId = `player-${state.players.length + 1}`;
-          const colors = ['#00C8E0', '#7C3AED', '#F43F5E', '#F59E0B', '#10B981', '#EC4899', '#F97316', '#06B6D4'];
-          const icons = ['🌊', '⚡', '🌹', '⭐', '🍀', '🔮', '🔸', '🌐'];
-          const newPlayer: Player = {
-            id: joinedPlayerId,
-            name: playerName || `Player ${state.players.length + 1}`,
-            balance: state.settings.startingBalance || 1500000,
-            properties: [],
-            position: 0,
-            color: color || colors[state.players.length] || '#000',
-            isActive: true,
-            isInJail: false,
-            jailTurns: 0,
-            pieceIcon: icon || icons[state.players.length] || '👤',
-            discoveredProperties: [0]
-          };
-          
-          state.players.push(newPlayer);
-          
-          // Check auto-start
-          if (state.players.length === state.settings.maxPlayers) {
-            if (state.settings.auctionsEnabled) {
-              state.preAuctionPhase = true;
-              state.gamePhase = 'auction';
-            } else {
-              state.gamePhase = 'playing';
+          tx.update(roomRef, { gameState: { ...state, players: updatedPlayers }, lastUpdated: Date.now() });
+          return { id: existingPlayer.id };
+        }
+
+        if (state.players.length >= state.settings.maxPlayers) return { error: 'Lobby is currently full!' };
+        if (state.gamePhase !== 'setup') return { error: 'That game has already started.' };
+
+        // Highest existing id + 1 (length + 1 collides after a player is removed)
+        const maxId = state.players.reduce((m, p) => Math.max(m, parseInt(p.id.replace('player-', ''), 10) || 0), 0);
+        const joinedPlayerId = `player-${maxId + 1}`;
+        const colors = ['#00C8E0', '#7C3AED', '#F43F5E', '#F59E0B', '#10B981', '#EC4899', '#F97316', '#06B6D4'];
+        const icons = ['🌊', '⚡', '🌹', '⭐', '🍀', '🔮', '🔸', '🌐'];
+        const newPlayer: Player = {
+          id: joinedPlayerId,
+          name: playerName || `Player ${state.players.length + 1}`,
+          balance: state.settings.startingBalance || 1500000,
+          properties: [],
+          position: 0,
+          color: color || colors[state.players.length] || '#000',
+          isActive: true,
+          isInJail: false,
+          jailTurns: 0,
+          pieceIcon: icon || icons[state.players.length] || '👤',
+          discoveredProperties: [0]
+        };
+
+        const next: GameState = { ...state, players: [...state.players, newPlayer] };
+        // Auto-start when the lobby fills. With auctions on this enters the draft; the host's client
+        // drives it (and falls through to normal play when no draft properties were chosen).
+        if (next.players.length === next.settings.maxPlayers) {
+          if (next.settings.auctionsEnabled) {
+            next.preAuctionPhase = true;
+            next.gamePhase = 'auction';
+          } else {
+            next.gamePhase = 'playing';
+            if (next.settings.turnTimerDuration && next.settings.turnTimerDuration > 0) {
+              next.turnEndTime = Date.now() + (next.settings.turnTimerDuration * 1000);
             }
           }
-          await setDoc(roomRef, { 
-            ...data, 
-            gameState: state,
-            lastUpdated: Date.now(),
-            playerCount: state.players.length
-          });
         }
-        
-        setLobbyCode(code);
-        setLocalPlayerId(joinedPlayerId);
-        setIsLobbyOwner(false);
-        setShowLobby(false);
-      } else {
-        alert("Room not found! Please check the code and try again.");
+        tx.update(roomRef, { gameState: next, lastUpdated: Date.now(), playerCount: next.players.length });
+        return { id: joinedPlayerId };
+      });
+
+      if ('error' in result) {
+        alert(result.error);
+        return;
       }
+      setLobbyCode(code);
+      setLocalPlayerId(result.id);
+      setIsLobbyOwner(false);
+      setShowLobby(false);
     } catch (error) {
       console.error("Error joining room:", error);
       alert("Error joining room. Check console for details.");
@@ -725,21 +768,48 @@ const MonopolyGame: React.FC = () => {
             Players Joined: {gameState.players.length} / {gameState.settings.maxPlayers}
           </p>
           <div className="mt-8 flex justify-center gap-4 flex-wrap max-w-2xl mx-auto">
-            {gameState.players.map(p => (
-              <Badge key={p.id} style={{backgroundColor: p.color}} className="text-xl py-3 px-6 shadow-lg text-white border-2 border-white/20">
-                <span className="mr-2 text-2xl" dangerouslySetInnerHTML={{__html: p.pieceIcon}} /> {p.name}
-              </Badge>
-            ))}
+            {gameState.players.map(p => {
+              const lastSeen = playerPresence[p.id];
+              const isAway = !lastSeen || Date.now() - lastSeen > 45000;
+              return (
+                <div key={p.id} className="flex items-center gap-1">
+                  <Badge style={{backgroundColor: p.color}} className="text-xl py-3 px-6 shadow-lg text-white border-2 border-white/20">
+                    <span className="mr-2 text-2xl" dangerouslySetInnerHTML={{__html: p.pieceIcon}} />
+                    {p.name}
+                    {isAway && <span className="ml-2 text-sm text-red-200 opacity-80">⚠️ Away</span>}
+                  </Badge>
+                  {isLobbyOwner && p.id !== localPlayerId && isAway && (
+                    <button
+                      onClick={() => removePlayerFromLobby(p.id)}
+                      className="w-6 h-6 flex items-center justify-center bg-red-700/80 hover:bg-red-600 text-white rounded-full text-xs border border-red-500 transition-colors"
+                      title={`Remove ${p.name} from lobby`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {isLobbyOwner && gameState.settings.allowPropertyEditing && (
+          {isLobbyOwner && gameState.players.length >= 2 && (
             <div className="mt-8 flex justify-center">
+              <Button
+                onClick={handleStartGame}
+                className="bg-green-600 hover:bg-green-700 font-bold text-xl px-10 py-5 shadow-xl border border-green-400/50 transition-all hover:scale-105"
+              >
+                🚀 Start Game Now ({gameState.players.length} players)
+              </Button>
+            </div>
+          )}
+          {isLobbyOwner && gameState.settings.allowPropertyEditing && (
+            <div className="mt-4 flex justify-center">
               <Button onClick={() => setIsEditorOpen(true)} className="bg-purple-600 hover:bg-purple-700 font-bold text-lg px-8 py-4 shadow-xl border border-purple-400/50 transition-all hover:scale-105">
                 ✏️ Open Property Editor
               </Button>
             </div>
           )}
-          <p className="mt-12 text-slate-400 italic">
-            The game will start automatically when the lobby limit is reached.
+          <p className="mt-8 text-slate-400 italic text-sm">
+            Host can start now, or the game auto-starts when all {gameState.settings.maxPlayers} slots are filled.
           </p>
         </div>
         
@@ -870,7 +940,7 @@ const MonopolyGame: React.FC = () => {
             isRolling={isRolling}
             onRollDice={handleDiceRoll}
             onEndTurn={endTurn}
-            canRoll={gameState.turnState === 'waiting_for_roll' && isMyTurn}
+            canRoll={gameState.turnState === 'waiting_for_roll' && isMyTurn && gameState.gamePhase === 'playing'}
             canEndTurn={gameState.turnState === 'completed' && isMyTurn}
             turnState={gameState.turnState}
             playerColor={currentPlayer.color}
@@ -883,17 +953,24 @@ const MonopolyGame: React.FC = () => {
             turnTimer={isMyTurn ? turnTimer : null}
             turnTimerDuration={gameState.settings.turnTimerDuration}
           >
-            {(showJailDialog || myPendingCard || myPendingRentData || currentAuctionData || pendingPurchaseData || ownedPropertyOnTile || landedOnOwnProperty) ? (
+            {(showJailDialog || myPendingCard || myPendingRentData || landedOnOwnProperty || ownedPropertyOnTile || currentAuctionData || (pendingPurchaseData && isMyTurn)) ? (
               <div className="absolute inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-slate-950/90 rounded-sm backdrop-blur-sm overflow-y-auto overflow-x-hidden pointer-events-auto">
                 <div className="w-full max-w-sm h-fit">
                   {showJailDialog ? (
                     <div className="bg-slate-900 rounded-xl shadow-2xl w-full border-2 border-rose-500 p-5 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">🔒</span>
-                        <div>
-                          <h3 className="text-lg font-bold text-rose-400">You're in Jail!</h3>
-                          <p className="text-xs text-slate-400">{myPlayer.jailTurns} turn{myPlayer.jailTurns !== 1 ? 's' : ''} remaining</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">🔒</span>
+                          <div>
+                            <h3 className="text-lg font-bold text-rose-400">You're in Jail!</h3>
+                            <p className="text-xs text-slate-400">{myPlayer.jailTurns} turn{myPlayer.jailTurns !== 1 ? 's' : ''} remaining</p>
+                          </div>
                         </div>
+                        {turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && (
+                          <Badge className={`font-mono border flex-shrink-0 ${turnTimer <= 10 ? 'text-red-400 border-red-500 animate-pulse' : 'text-cyan-400 border-cyan-500'}`}>
+                            ⏳ {turnTimer}s
+                          </Badge>
+                        )}
                       </div>
                       {jailFine > 0 ? (
                         <div className="bg-rose-950/40 rounded-lg p-3 border border-rose-800/50 text-sm space-y-1">
@@ -924,14 +1001,21 @@ const MonopolyGame: React.FC = () => {
                     </div>
                   ) : myPendingCard ? (
                     <div className={`bg-slate-900 rounded-xl shadow-2xl w-full border-2 ${myPendingCard.isReward ? 'border-yellow-500' : 'border-red-600'} p-5 space-y-4`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">{myPendingCard.type === 'chance' ? '🎲' : '📋'}</span>
-                        <div>
-                          <h3 className={`text-lg font-bold ${myPendingCard.isReward ? 'text-yellow-400' : 'text-red-400'}`}>
-                            {myPendingCard.type === 'chance' ? 'Chance' : 'Community Chest'}
-                          </h3>
-                          <p className="text-xs text-slate-400">Dice roll: {myPendingCard.diceRoll} ({myPendingCard.diceRoll % 2 !== 0 ? 'odd → reward' : 'even → penalty'})</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">{myPendingCard.type === 'chance' ? '🎲' : '📋'}</span>
+                          <div>
+                            <h3 className={`text-lg font-bold ${myPendingCard.isReward ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {myPendingCard.type === 'chance' ? 'Chance' : 'Community Chest'}
+                            </h3>
+                            <p className="text-xs text-slate-400">Dice roll: {myPendingCard.diceRoll} ({myPendingCard.diceRoll % 2 !== 0 ? 'odd → reward' : 'even → penalty'})</p>
+                          </div>
                         </div>
+                        {turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && (
+                          <Badge className={`font-mono border flex-shrink-0 ${turnTimer <= 10 ? 'text-red-400 border-red-500 animate-pulse' : 'text-cyan-400 border-cyan-500'}`}>
+                            ⏳ {turnTimer}s
+                          </Badge>
+                        )}
                       </div>
                       {myPendingCard.amount > 0 ? (
                         <div className={`rounded-lg p-3 border text-sm space-y-1 ${myPendingCard.isReward ? 'bg-yellow-950/40 border-yellow-800/50' : 'bg-red-950/40 border-red-800/50'}`}>
@@ -1037,7 +1121,7 @@ const MonopolyGame: React.FC = () => {
                           endTurn();
                         }
                       }}
-                      onEndAuction={endAuction}
+                      onEndAuction={endAuctionNow}
                       players={gameState.players.map(p => p.name)}
                       currentPlayer={myPlayer.name}
                       auctionsEnabled={gameState.settings.auctionsEnabled}

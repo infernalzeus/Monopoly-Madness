@@ -18,7 +18,29 @@ export const addEvent = (state: GameState, type: GameEvent['type'], player: stri
   };
 };
 
-export const advanceTurn = (state: GameState): GameState => {
+// Anything still unresolved when a turn ends (timer expiry, forced advance) is settled in the
+// bank's/creditor's favour so a player can never dodge rent or a card penalty by running out the clock.
+export const settlePending = (state: GameState): GameState => {
+  let s = state;
+  if (s.pendingCard) s = resolvePendingCard(s);
+  if (s.pendingRent && s.gamePhase !== 'ended') {
+    const { owner, amount, propertyId } = s.pendingRent;
+    const prop = s.properties.find(p => p.id === propertyId);
+    const payer = s.players.find(p => p.id === s.currentPlayer);
+    s = { ...s, pendingRent: null };
+    if (payer) {
+      s = applyPayment(s, s.currentPlayer, owner, amount, 'Rent');
+      s = addEvent(s, 'rent', payer.name, `paid $${amount.toLocaleString('en-US')} rent to ${owner}${prop ? ` for ${prop.name}` : ''}`, -amount);
+    }
+  }
+  if (s.pendingPurchase) s = { ...s, pendingPurchase: null };
+  return s;
+};
+
+export const advanceTurn = (rawState: GameState): GameState => {
+  if (rawState.gamePhase === 'ended') return rawState;
+  const state = settlePending(rawState);
+  if (state.gamePhase === 'ended') return state;
   const playerCount = state.players.length;
   const currentIndex = state.players.findIndex(p => p.id === state.currentPlayer);
   let nextIndex = (currentIndex + 1) % playerCount;
@@ -64,7 +86,7 @@ export const computePlayerIncome = (properties: Property[], playerName: string):
 };
 
 export const rollDiceLogic = (state: GameState, diceResult: DiceRoll): GameState => {
-  if (state.turnState !== 'waiting_for_roll') return state;
+  if (state.turnState !== 'waiting_for_roll' || state.gamePhase !== 'playing') return state;
   
   let nextState: GameState = { ...state, turnState: 'processing', lastDiceRoll: diceResult };
   const currentPlayerData = nextState.players.find(p => p.id === nextState.currentPlayer);
@@ -290,32 +312,102 @@ export const checkWinCondition = (state: GameState): GameState => {
   return state;
 };
 
-// Apply payment and check bankruptcy
+// ── Build / mortgage rules (single source of truth for hook + UI) ──────────────
+export const buildLevel = (p: Property): number => (p.hasHotel ? 5 : p.houses);
+export const mortgagePayout = (p: Property): number => Math.round(p.currentValue * 0.5);
+export const unmortgageCost = (p: Property): number => Math.round(mortgagePayout(p) * 1.1);
+
+const colorGroupOf = (properties: Property[], property: Property): Property[] =>
+  property.colorGroup ? properties.filter(p => p.type === 'property' && p.colorGroup === property.colorGroup) : [];
+
+export const ownsFullGroup = (properties: Property[], property: Property, ownerName: string): boolean => {
+  const group = colorGroupOf(properties, property);
+  return group.length > 0 && group.every(p => p.owner === ownerName && !p.isMortgaged && !p.isInactive);
+};
+
+// Even-build: a property may only be raised when it is at the lowest level in its group (hotel = level 5).
+export const canBuildHouseOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+  if (property.type !== 'property' || property.isMortgaged || property.isInactive || property.hasHotel) return false;
+  if (property.owner !== ownerName || property.houses >= 4) return false;
+  if (!ownsFullGroup(properties, property, ownerName)) return false;
+  const minLevel = Math.min(...colorGroupOf(properties, property).map(buildLevel));
+  return buildLevel(property) <= minLevel;
+};
+
+export const canBuildHotelOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+  if (property.type !== 'property' || property.isMortgaged || property.isInactive || property.hasHotel) return false;
+  if (property.owner !== ownerName || property.houses !== 4) return false;
+  if (!ownsFullGroup(properties, property, ownerName)) return false;
+  return Math.min(...colorGroupOf(properties, property).map(buildLevel)) >= 4;
+};
+
+// Even-sell: a property may only be lowered when it is at the highest level in its group.
+export const canSellBuildingOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+  if (property.type !== 'property' || property.owner !== ownerName || buildLevel(property) <= 0) return false;
+  return buildLevel(property) >= Math.max(...colorGroupOf(properties, property).map(buildLevel));
+};
+
+// ── Chance / Community Chest resolution (income-based) ──────────────────────────
+export const resolvePendingCard = (state: GameState): GameState => {
+  const pc = state.pendingCard;
+  if (!pc) return state;
+  const cp = state.players.find(p => p.id === state.currentPlayer);
+  const cleared: GameState = { ...state, pendingCard: null };
+  if (!cp) return cleared;
+
+  const amount = pc.amount ?? 0;
+  const label = pc.type === 'chance' ? 'Chance' : 'Community Chest';
+  const rollLabel = `roll ${pc.diceRoll} — ${pc.diceRoll % 2 !== 0 ? 'odd' : 'even'}`;
+  if (amount <= 0) {
+    return addEvent(cleared, 'card', cp.name, `${label} (${rollLabel}): No properties — no change`);
+  }
+  const msg = `${label} (${rollLabel}): ${pc.isReward ? '+' : '-'}$${amount.toLocaleString('en-US')} from ${pc.numProperties} prop${pc.numProperties !== 1 ? 's' : ''}`;
+  let next = addEvent(cleared, 'card', cp.name, msg, pc.isReward ? amount : -amount);
+  if (pc.isReward) {
+    return { ...next, players: next.players.map(p => p.id === cp.id ? { ...p, balance: p.balance + amount } : p) };
+  }
+  return applyPayment(next, cp.id, null, amount, label); // penalty can bankrupt
+};
+
+// Apply payment and check bankruptcy.
+// Creditor only receives what the payer actually had. A bankrupt player's properties become neutral
+// inactive tiles (no rent, no purchase); their workers and pending trade offers are cleared.
 export const applyPayment = (state: GameState, fromId: string, toPlayerName: string | null, amount: number, reason: string): GameState => {
-  let players = [...state.players];
-  const payerIdx = players.findIndex(p => p.id === fromId);
-  if (payerIdx === -1) return state;
-  players[payerIdx] = { ...players[payerIdx], balance: players[payerIdx].balance - amount };
+  const payerIdx = state.players.findIndex(p => p.id === fromId);
+  if (payerIdx === -1 || amount <= 0) return state;
+  const payer = state.players[payerIdx];
+  const goesBankrupt = payer.balance - amount < 0;
+  const received = goesBankrupt ? Math.max(0, payer.balance) : amount;
 
-  if (toPlayerName) {
-    const receiverIdx = players.findIndex(p => p.name === toPlayerName);
-    if (receiverIdx !== -1) {
-      players[receiverIdx] = { ...players[receiverIdx], balance: players[receiverIdx].balance + amount };
+  const players = state.players.map((p, i) => {
+    if (i === payerIdx) {
+      return goesBankrupt
+        ? { ...p, balance: 0, isActive: false, properties: [] as string[] }
+        : { ...p, balance: p.balance - amount };
     }
-  }
+    if (toPlayerName && p.name === toPlayerName) return { ...p, balance: p.balance + received };
+    return p;
+  });
 
-  // Bankruptcy — mark player inactive; their properties become neutral inactive tiles
-  let nextState = { ...state, players };
-  if (players[payerIdx].balance < 0) {
-    players[payerIdx] = { ...players[payerIdx], isActive: false };
-    const bankruptName = players[payerIdx].name;
-    const inactiveProps = state.properties.map(prop =>
-      prop.owner === bankruptName
-        ? { ...prop, isInactive: true, isMortgaged: false }
-        : prop
-    );
-    nextState = { ...nextState, players, properties: inactiveProps };
+  let nextState: GameState = { ...state, players };
+  if (goesBankrupt) {
+    nextState = {
+      ...nextState,
+      properties: state.properties.map(prop =>
+        prop.owner === payer.name
+          ? { ...prop, isInactive: true, isMortgaged: false, houses: 0, hasHotel: false }
+          : prop
+      ),
+      workers: (state.workers || []).filter(w => w.ownerId !== payer.id),
+      tradeOffers: (state.tradeOffers || []).map(o =>
+        o.status === 'pending' && (o.fromPlayer === payer.name || o.toPlayer === payer.name)
+          ? { ...o, status: 'rejected' as const }
+          : o
+      ),
+      turnState: state.currentPlayer === payer.id ? 'completed' : state.turnState,
+      pendingPurchase: state.currentPlayer === payer.id ? null : state.pendingPurchase
+    };
+    nextState = addEvent(nextState, 'bankrupt', payer.name, `went bankrupt (${reason})`);
   }
-
   return checkWinCondition(nextState);
 };
