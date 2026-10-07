@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.9`**  
+> **Current Version: `v1.1.10`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,16 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.10 — UI kit wired in
+
+Codex built `src/ui-kit/` (presentation-only; contract in `UI_KIT.md`). Wired via two adapters so rules stay in the hook: **`StageHost.tsx`** picks the ONE action that owns the board stage (jail → card → rent → own property → auction → purchase) and renders it with the kit's `ActionStage` + dialog bodies (phone = bottom sheet with a sticky action footer, desktop = centred stage); **`TradeHost.tsx`** maps GameState → `TradeSheet` (labels, lock reasons, expiry, recipient-only Accept). Also wired: `TurnStatus` strip (shared countdown), `GameOverCard` (+ host Rematch), `WaitingRoom`, `LogSheet`, `AuctionStatus` (one-tap bids, outbid state, seller Collect in the footer). Sheets on desktop sit in a right-hand `SheetDock`; the Game Log button drops below the sheets (z-90).
+
+Behaviour changes: the **seller "Start auction" (custom starting bid) button is gone from the UI** — Pass now opens a bank auction automatically when auctions are on (the hook action `startAuction` still exists). The "make an offer on an owned tile" panel still uses the old `AuctionPanel`.
+
+Not yet wired (kit components that exist): `PropertyTile`/`SelectedTileSummary` (phone board), `PlayerSheet`, `TeamsSheet`, `WorkersSheet`, `PlayerIdentity`/`CurrencyAmount` in the legacy panels.
 
 ---
 

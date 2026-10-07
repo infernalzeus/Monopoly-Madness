@@ -25,6 +25,7 @@ function load(file, originalHook = false) {
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
   vm.runInNewContext(code, { module, exports: module.exports, console, Date, Math, setTimeout, clearTimeout, setInterval, clearInterval,
     require(name) {
+      if (name.endsWith('.css')) return {};
       if (name === 'firebase/firestore') return {};
       if (name.endsWith('/lib/firebase')) return { db: {}, authReady: Promise.resolve(null), currentUid: () => 'fixture' };
       if (name === '@/hooks/useGameLogic' && !originalHook) return {
@@ -35,7 +36,7 @@ function load(file, originalHook = false) {
       };
       if (name.startsWith('.') || name.startsWith('@/')) {
         const base = name.startsWith('@/') ? path.join(root, 'src', name.slice(2)) : path.resolve(path.dirname(file), name);
-        const resolved = ['.tsx', '.ts', '.js', ''].map(ext => base + ext).find(p => fs.existsSync(p) && fs.statSync(p).isFile());
+        const resolved = ['.tsx', '.ts', '.js', '', '/index.ts', '/index.tsx'].map(ext => base + ext).find(p => fs.existsSync(p) && fs.statSync(p).isFile());
         if (!resolved) throw new Error(`Cannot resolve ${name}`);
         return load(resolved);
       }

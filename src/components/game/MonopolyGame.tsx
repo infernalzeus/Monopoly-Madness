@@ -17,6 +17,10 @@ import TeamPanel from './TeamPanel';
 import { db, authReady, currentUid } from '@/lib/firebase';
 import { setClockOffset } from '@/lib/clock';
 import { readableTextOn } from '@/lib/utils';
+import '@/ui-kit/tokens.css';
+import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
+import StageHost from './StageHost';
+import TradeHost from './TradeHost';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -32,6 +36,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+
+/** Positions a kit sheet as a right-hand dock on desktop; on phones the kit's own bottom sheet takes over. */
+const SheetDock: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="fixed z-[150] right-4 top-16 bottom-4 w-[min(480px,calc(100vw-2rem))] max-sm:contents pointer-events-none [&>*]:pointer-events-auto">{children}</div>
+);
 
 const MonopolyGame: React.FC = () => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -64,6 +73,7 @@ const MonopolyGame: React.FC = () => {
   // Wait for anonymous sign-in (resolves to null if the provider is off — the app then runs unauthenticated)
   const [authChecked, setAuthChecked] = useState(false);
   const [winnerDismissed, setWinnerDismissed] = useState(false);
+  const [roomCopied, setRoomCopied] = useState(false);
   useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
   // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
   const [playerPresence, setPlayerPresence] = useState<Record<string, number>>({});
@@ -797,58 +807,36 @@ const MonopolyGame: React.FC = () => {
   if (gameState.gamePhase === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-        <div className="text-center text-white bg-slate-900/50 p-4 sm:p-8 rounded-xl border border-cyan-400/30 w-full max-w-3xl">
-          <h1 className="text-2xl sm:text-4xl font-bold mb-4">Waiting for players to join...</h1>
-          <p className="text-lg sm:text-2xl mb-8 font-mono bg-black/40 py-2 px-4 rounded-lg inline-block text-green-400 break-all">
-            Lobby Code: {lobbyCode}
-          </p>
-          <p className="text-xl mb-4 text-cyan-200">
-            Players Joined: {gameState.players.length} / {gameState.settings.maxPlayers}
-          </p>
-          <div className="mt-8 flex justify-center gap-4 flex-wrap max-w-2xl mx-auto">
-            {gameState.players.map(p => {
-              const lastSeen = playerPresence[p.id];
-              const isAway = !lastSeen || Date.now() - lastSeen > 45000;
-              return (
-                <div key={p.id} className="flex items-center gap-1">
-                  <Badge style={{backgroundColor: p.color, color: readableTextOn(p.color)}} className="text-base sm:text-xl py-2 sm:py-3 px-3 sm:px-6 shadow-lg border-2 border-white/20 max-w-full">
-                    <span className="mr-2 text-2xl" dangerouslySetInnerHTML={{__html: p.pieceIcon}} />
-                    {p.name}
-                    {isAway && <span className="ml-2 text-sm text-red-200 opacity-80">⚠️ Away</span>}
-                  </Badge>
-                  {isLobbyOwner && p.id !== localPlayerId && isAway && (
-                    <button
-                      onClick={() => removePlayerFromLobby(p.id)}
-                      className="w-6 h-6 flex items-center justify-center bg-red-700/80 hover:bg-red-600 text-white rounded-full text-xs border border-red-500 transition-colors"
-                      title={`Remove ${p.name} from lobby`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {isLobbyOwner && gameState.players.length >= 2 && (
-            <div className="mt-8 flex justify-center">
-              <Button
-                onClick={handleStartGame}
-                className="bg-green-600 hover:bg-green-700 font-bold text-xl px-10 py-5 shadow-xl border border-green-400/50 transition-all hover:scale-105"
-              >
-                🚀 Start Game Now ({gameState.players.length} players)
-              </Button>
+        <div className="w-full max-w-3xl space-y-3">
+          <WaitingRoom
+            roomCode={lobbyCode}
+            seats={gameState.players.map((p, i) => ({
+              name: p.name, color: p.color, icon: p.pieceIcon, marker: i + 1,
+              isYou: p.id === localPlayerId, isBot: p.isBot,
+              isAway: !p.isBot && (!playerPresence[p.id] || Date.now() - playerPresence[p.id] > 45000)
+            }))}
+            maxPlayers={gameState.settings.maxPlayers}
+            isHost={isLobbyOwner}
+            onStart={isLobbyOwner ? handleStartGame : undefined}
+            startDisabledReason={gameState.players.length < 2 ? 'Need at least 2 players to start.' : undefined}
+            onCopy={(code) => {
+              navigator.clipboard?.writeText(code).then(() => { setRoomCopied(true); setTimeout(() => setRoomCopied(false), 2000); }).catch(() => {});
+            }}
+            copied={roomCopied}
+            onEditProperties={isLobbyOwner && gameState.settings.allowPropertyEditing ? () => setIsEditorOpen(true) : undefined}
+          />
+          {isLobbyOwner && gameState.players.some(p => p.id !== localPlayerId && !p.isBot && (!playerPresence[p.id] || Date.now() - playerPresence[p.id] > 45000)) && (
+            <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-3 space-y-2">
+              <p className="text-sm text-slate-300">Players who look disconnected — remove them to free their seat:</p>
+              <div className="flex flex-wrap gap-2">
+                {gameState.players.filter(p => p.id !== localPlayerId && !p.isBot && (!playerPresence[p.id] || Date.now() - playerPresence[p.id] > 45000)).map(p => (
+                  <button key={p.id} onClick={() => removePlayerFromLobby(p.id)} className="min-h-[44px] px-4 rounded-lg bg-red-900/60 hover:bg-red-800 border border-red-600 text-red-100 text-sm font-semibold">
+                    Remove {p.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          {isLobbyOwner && gameState.settings.allowPropertyEditing && (
-            <div className="mt-4 flex justify-center">
-              <Button onClick={() => setIsEditorOpen(true)} className="bg-purple-600 hover:bg-purple-700 font-bold text-lg px-8 py-4 shadow-xl border border-purple-400/50 transition-all hover:scale-105">
-                ✏️ Open Property Editor
-              </Button>
-            </div>
-          )}
-          <p className="mt-8 text-slate-400 italic text-sm">
-            Host can start now, or the game auto-starts when all {gameState.settings.maxPlayers} slots are filled.
-          </p>
         </div>
         
         <GameConsole
@@ -877,36 +865,28 @@ const MonopolyGame: React.FC = () => {
         {gameState.gameEvents.length > 0 ? `${gameState.gameEvents[gameState.gameEvents.length - 1].player} ${gameState.gameEvents[gameState.gameEvents.length - 1].message}` : ''}
       </div>
 
-      {/* Persistent result screen (the win toast used to be the only signal) */}
+      {/* Persistent result screen (kit GameOverCard) */}
       {gameState.gamePhase === 'ended' && !winnerDismissed && (() => {
         const winner = gameState.players.find(p => p.id === gameState.winnerId);
         const winTeam = gameState.winnerTeamId ? gameState.teams.find(t => t.id === gameState.winnerTeamId) : null;
-        const worth = (p: Player) => p.balance + gameState.properties.filter(pr => pr.owner === p.name && !pr.isInactive).reduce((a, pr) => a + pr.currentValue, 0);
-        const standings = [...gameState.players].sort((a, b) => Number(b.isActive) - Number(a.isActive) || worth(b) - worth(a));
+        const worth = (p: Player) => p.isActive ? p.balance + gameState.properties.filter(pr => pr.owner === p.name && !pr.isInactive).reduce((a, pr) => a + pr.currentValue, 0) : 0;
+        const ordered = [...gameState.players].filter(p => !p.isSpectator).sort((a, b) => Number(b.isActive) - Number(a.isActive) || worth(b) - worth(a));
         return (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Game over">
-            <div className="w-full max-w-md bg-slate-900 border-2 border-amber-400/70 rounded-2xl p-5 space-y-4 shadow-2xl">
-              <div className="text-center">
-                <div className="text-xs uppercase tracking-widest text-amber-300">Game over</div>
-                <h2 className="text-2xl font-black text-white mt-1">{winTeam ? `Team ${winTeam.name} wins` : winner ? `${winner.name} wins` : 'No winner'}</h2>
-              </div>
-              <ol className="space-y-1.5">
-                {standings.map((p, i) => (
-                  <li key={p.id} className="flex items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
-                    <span className="w-5 text-slate-400 font-mono">{i + 1}</span>
-                    <span className="w-1.5 self-stretch rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
-                    <span className="flex-1 truncate font-semibold text-slate-100">{p.name}{p.id === localPlayerId ? ' (you)' : ''}</span>
-                    <span className={p.isActive ? 'text-slate-200 font-mono' : 'text-rose-300'}>{p.isActive ? `$${worth(p).toLocaleString('en-US')}` : 'Bankrupt'}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="flex gap-3">
-                <button onClick={() => setWinnerDismissed(true)} className="flex-1 min-h-[44px] rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold text-sm">View board</button>
-                {isLobbyOwner && (
-                  <button onClick={() => { setWinnerDismissed(false); rematch(); }} className="flex-1 min-h-[44px] rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm">Rematch</button>
-                )}
-                <button onClick={() => { window.location.href = window.location.pathname; }} className="flex-1 min-h-[44px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm">Back to lobby</button>
-              </div>
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Game over">
+            <div className="w-full max-w-lg space-y-3">
+              <GameOverCard
+                winnerName={winner?.name ?? 'Nobody'}
+                winnerTeamName={winTeam?.name}
+                standings={ordered.map((p, i) => ({
+                  rank: i + 1, netWorth: worth(p),
+                  player: { name: p.name, color: p.color, icon: p.pieceIcon, marker: gameState.players.indexOf(p) + 1, isYou: p.id === localPlayerId, isBot: p.isBot, isBankrupt: !p.isActive }
+                }))}
+                onBackToLobby={() => { window.location.href = window.location.pathname; }}
+                isHost={isLobbyOwner}
+                canRematch={isLobbyOwner}
+                onRematch={() => { setWinnerDismissed(false); rematch(); }}
+              />
+              <button onClick={() => setWinnerDismissed(true)} className="w-full min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-600">View the final board</button>
             </div>
           </div>
         );
@@ -1005,6 +985,25 @@ const MonopolyGame: React.FC = () => {
         </CardHeader>
       </Card>
 
+      {/* Turn strip: whose turn, what is expected, shared countdown */}
+      <div className="mb-3">
+        <TurnStatus
+          actorName={currentPlayer.name}
+          isMine={isMyTurn}
+          secondsLeft={turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && gameState.gamePhase === 'playing' && !gameState.currentAuction ? turnTimer : undefined}
+          totalSeconds={gameState.settings.turnTimerDuration || 60}
+          phase={
+            gameState.gamePhase === 'ended' ? 'Game over'
+            : gameState.currentAuction ? (gameState.preAuctionPhase ? 'Draft auction in progress' : 'Auction in progress')
+            : gameState.gamePhase === 'auction' ? 'Preparing the draft'
+            : gameState.turnState === 'waiting_for_roll' ? (isMyTurn ? 'Roll the dice' : `Waiting for ${currentPlayer.name} to roll`)
+            : gameState.turnState === 'waiting_for_action' ? (isMyTurn ? 'A decision is needed' : `${currentPlayer.name} is deciding`)
+            : gameState.turnState === 'processing' ? 'Moving…'
+            : 'Turn ending'
+          }
+        />
+      </div>
+
       {/* Main Game Layout */}
       <div className="flex flex-col gap-6">
         {/* Top/Main Area - Game Board and Dice */}
@@ -1039,154 +1038,21 @@ const MonopolyGame: React.FC = () => {
             turnTimer={isMyTurn ? turnTimer : null}
             turnTimerDuration={gameState.settings.turnTimerDuration}
           >
-            {(showJailDialog || myPendingCard || myPendingRentData || landedOnOwnProperty || ownedPropertyOnTile || currentAuctionData || (pendingPurchaseData && isMyTurn)) ? (
-              <div className="absolute inset-0 z-50 flex p-1 sm:p-4 bg-slate-950/90 rounded-sm backdrop-blur-sm overflow-y-auto overflow-x-hidden pointer-events-auto max-sm:fixed max-sm:z-[120] max-sm:p-0 max-sm:items-end max-sm:bg-slate-950/80" role="dialog" aria-modal="true" aria-label="Your turn: action required">
-                {/* m-auto centres a short panel and top-aligns a tall one (flex centring clipped the header); on phones it is a bottom sheet */}
-                <div className="w-full max-w-sm h-fit m-auto max-sm:m-0 max-sm:max-w-none max-sm:max-h-[88vh] max-sm:overflow-y-auto max-sm:rounded-t-2xl max-sm:border-t max-sm:border-slate-700 max-sm:pb-[env(safe-area-inset-bottom)]">
-                  {showJailDialog ? (
-                    <div className="bg-slate-900 rounded-xl shadow-2xl w-full border-2 border-rose-500 p-5 space-y-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">🔒</span>
-                          <div>
-                            <h3 className="text-lg font-bold text-rose-400">You're in Jail!</h3>
-                            <p className="text-xs text-slate-400">{myPlayer.jailTurns} turn{myPlayer.jailTurns !== 1 ? 's' : ''} remaining</p>
-                          </div>
-                        </div>
-                        {turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && (
-                          <Badge className={`font-mono border flex-shrink-0 ${turnTimer <= 10 ? 'text-red-400 border-red-500 animate-pulse' : 'text-cyan-400 border-cyan-500'}`}>
-                            ⏳ {turnTimer}s
-                          </Badge>
-                        )}
-                      </div>
-                      {jailFine > 0 ? (
-                        <div className="bg-rose-950/40 rounded-lg p-3 border border-rose-800/50 text-sm space-y-1">
-                          <p className="text-slate-300">Income properties: <span className="text-white font-bold">{jailNumProperties}</span></p>
-                          <p className="text-slate-300">Total rental income: <span className="text-white font-bold">${jailIncome.toLocaleString('en-US')}</span></p>
-                          <p className="text-slate-300">Bail fine (20%): <span className="text-rose-300 font-bold">${jailFine.toLocaleString('en-US')}</span></p>
-                          <p className="text-xs text-slate-500">Pay now to roll and move freely this turn.</p>
-                        </div>
-                      ) : (
-                        <p className="text-slate-400 text-sm">You have no property income — you cannot afford bail.</p>
-                      )}
-                      {(myPlayer.jailCards || 0) > 0 && (
-                        <button
-                          onClick={spendJailCard}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
-                        >
-                          🃏 Use Get Out of Jail Free card ({myPlayer.jailCards})
-                        </button>
-                      )}
-                      <div className="flex gap-3">
-                        {jailFine > 0 && myPlayer.balance >= jailFine && (
-                          <button
-                            onClick={payJailFine}
-                            className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
-                          >
-                            Pay ${jailFine.toLocaleString('en-US')} &amp; Roll
-                          </button>
-                        )}
-                        <button
-                          onClick={skipJailTurn}
-                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2 px-4 rounded-lg text-sm transition-colors"
-                        >
-                          Stay in Jail
-                        </button>
-                      </div>
-                    </div>
-                  ) : myPendingCard ? (
-                    <div className={`bg-slate-900 rounded-xl shadow-2xl w-full border-2 ${myPendingCard.isReward ? 'border-yellow-500' : 'border-red-600'} p-5 space-y-4`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{myPendingCard.type === 'chance' ? '🎲' : '📋'}</span>
-                          <div>
-                            <h3 className={`text-lg font-bold ${myPendingCard.isReward ? 'text-yellow-400' : 'text-red-400'}`}>
-                              {myPendingCard.type === 'chance' ? 'Chance' : 'Community Chest'}
-                            </h3>
-                            <p className="text-xs text-slate-400">Dice roll: {myPendingCard.diceRoll} ({myPendingCard.diceRoll % 2 !== 0 ? 'odd → reward' : 'even → penalty'})</p>
-                          </div>
-                        </div>
-                        {turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && (
-                          <Badge className={`font-mono border flex-shrink-0 ${turnTimer <= 10 ? 'text-red-400 border-red-500 animate-pulse' : 'text-cyan-400 border-cyan-500'}`}>
-                            ⏳ {turnTimer}s
-                          </Badge>
-                        )}
-                      </div>
-                      {myPendingCard.amount > 0 ? (
-                        <div className={`rounded-lg p-3 border text-sm space-y-1 ${myPendingCard.isReward ? 'bg-yellow-950/40 border-yellow-800/50' : 'bg-red-950/40 border-red-800/50'}`}>
-                          <p className="text-slate-300">Total property income: <span className="text-white font-bold">${myPendingCard.income.toLocaleString('en-US')}</span></p>
-                          <p className="text-slate-300">Properties owned: <span className="text-white font-bold">{myPendingCard.numProperties}</span></p>
-                          <p className="text-slate-300">10% of income: <span className={`font-bold ${myPendingCard.isReward ? 'text-yellow-300' : 'text-red-300'}`}>{myPendingCard.isReward ? '+' : '-'}${myPendingCard.amount.toLocaleString('en-US')}</span></p>
-                        </div>
-                      ) : (
-                        <p className="text-slate-400 text-sm">No properties — no reward or penalty this time.</p>
-                      )}
-                      <button
-                        onClick={() => { setCardResolved(true); resolveCard(); }}
-                        className={`w-full font-bold py-2 px-4 rounded-lg text-sm transition-colors text-white ${myPendingCard.isReward ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-red-700 hover:bg-red-800'}`}
-                      >
-                        {(myPendingCard.amount ?? 0) > 0 ? (myPendingCard.isReward ? `Collect $${(myPendingCard.amount ?? 0).toLocaleString('en-US')}` : `Pay $${(myPendingCard.amount ?? 0).toLocaleString('en-US')}`) : 'Continue'}
-                      </button>
-                    </div>
-                  ) : myPendingRentData ? (
-                    <div className="bg-slate-900 rounded-xl shadow-2xl w-full border border-slate-700">
-                      <RentPaymentDialog
-                        property={myPendingRentData.property}
-                        amount={myPendingRentData.amount}
-                        owner={myPendingRentData.owner}
-                        onPayRent={payRent}
-                        onSkipRent={skipRent}
-                        currentPlayerBalance={myPlayer.balance || 0}
-                      />
-                    </div>
-                  ) : landedOnOwnProperty ? (
-                    <div className="bg-slate-900 rounded-xl shadow-2xl w-full border-2 border-emerald-500 p-5 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">🏠</span>
-                        <div>
-                          <h3 className="text-lg font-bold text-emerald-400">Your Property</h3>
-                          <p className="text-xs text-slate-400">{propertyOnMyTile?.name}</p>
-                        </div>
-                      </div>
-                      {propertyOnMyTile && propertyOnMyTile.type === 'property' && !propertyOnMyTile.hasHotel && (
-                        <div className="bg-emerald-950/40 rounded-lg p-3 border border-emerald-800/50 text-sm space-y-1">
-                          <p className="text-slate-300">Houses: <span className="text-white font-bold">{propertyOnMyTile.houses} / 4</span></p>
-                          <p className="text-slate-300">Next house cost: <span className="text-emerald-300 font-bold">${((propertyOnMyTile.houseCost || 0) * (propertyOnMyTile.houses + 1)).toLocaleString('en-US')}</span></p>
-                        </div>
-                      )}
-                      <div className="flex gap-3">
-                        {propertyOnMyTile && propertyOnMyTile.type === 'property' && !propertyOnMyTile.hasHotel && (
-                          propertyOnMyTile.houses < 4 ? (
-                            canBuildHouse(propertyOnMyTile, myPlayer.name) ? (
-                              <button
-                                onClick={() => { buildHouse(propertyOnMyTile.id); endTurn(); }}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
-                              >
-                                Build House 🏠
-                              </button>
-                            ) : (
-                              <p className="flex-1 text-xs text-amber-400 text-center self-center">
-                                Need full color group to build
-                              </p>
-                            )
-                          ) : (
-                            <button
-                              onClick={() => { buildHotel(propertyOnMyTile.id); endTurn(); }}
-                              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
-                            >
-                              Build Hotel 🏨
-                            </button>
-                          )
-                        )}
-                        <button
-                          onClick={endTurn}
-                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2 px-4 rounded-lg text-sm transition-colors"
-                        >
-                          End Turn
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+            <StageHost
+              gameState={gameState}
+              me={myPlayer}
+              isMyTurn={isMyTurn}
+              showJail={!!showJailDialog}
+              jailFine={jailFine}
+              pendingCard={myPendingCard}
+              onCardResolving={() => setCardResolved(true)}
+              rent={myPendingRentData ? { propertyName: myPendingRentData.property?.name ?? 'Property', owner: myPendingRentData.owner, amount: myPendingRentData.amount } : null}
+              landedOnOwn={landedOnOwnProperty ? (propertyOnMyTile ?? null) : null}
+              auctionTimer={auctionTimer}
+              actions={{ payJailFine, spendJailCard, skipJailTurn, resolveCard, payRent, purchaseProperty, skipPurchase, placeBid, endAuctionNow, buildHouse, buildHotel, endTurn, canBuildHouse }}
+              fallback={ownedPropertyOnTile ? (
+                <div className="absolute inset-0 z-50 flex p-1 sm:p-4 bg-slate-950/90 rounded-sm overflow-y-auto overflow-x-hidden max-sm:fixed max-sm:z-[120] max-sm:p-0 max-sm:items-end" role="dialog" aria-modal="true" aria-label="Make an offer">
+                  <div className="w-full max-w-sm h-fit m-auto max-sm:m-0 max-sm:max-w-none max-sm:max-h-[88vh] max-sm:overflow-y-auto max-sm:rounded-t-2xl">
                     <AuctionPanel
                       currentAuction={currentAuctionData}
                       pendingPurchase={pendingPurchaseData}
@@ -1221,10 +1087,10 @@ const MonopolyGame: React.FC = () => {
                       currentPlayer={myPlayer.name}
                       auctionsEnabled={gameState.settings.auctionsEnabled}
                     />
-                  )}
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+            />
           </MonopolyBoardLayout>
           </div>
           
@@ -1348,32 +1214,19 @@ const MonopolyGame: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Trading System Dialog */}
-              <Dialog open={isTradingOpen} onOpenChange={setIsTradingOpen}>
-                <DialogContent className="max-w-4xl bg-slate-900 border border-purple-500 max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold text-purple-400 flex items-center gap-2">
-                      <Handshake className="w-6 h-6" />
-                      Trading Market
-                    </DialogTitle>
-                  </DialogHeader>
-                  <TradingSystem
-                    currentPlayer={myPlayer}
-                    allPlayers={gameState.players}
-                    ownedProperties={myOwnedProperties}
-                    allProperties={gameState.properties}
-                    tradeOffers={gameState.tradeOffers}
-                    onCreateTradeOffer={createTradeOffer}
-                    onAcceptTradeOffer={acceptTradeOffer}
-                    onRejectTradeOffer={rejectTradeOffer}
-                    onCancelTradeOffer={cancelTradeOffer}
-                    onPlaceTradeBid={() => {}}
+              {/* Trading (kit TradeSheet via adapter) */}
+              {isTradingOpen && (
+                <SheetDock>
+                  <TradeHost
+                    gameState={gameState} me={myPlayer} onClose={() => setIsTradingOpen(false)}
+                    createTradeOffer={createTradeOffer} acceptTradeOffer={acceptTradeOffer}
+                    rejectTradeOffer={rejectTradeOffer} cancelTradeOffer={cancelTradeOffer}
                   />
-                </DialogContent>
-              </Dialog>
+                </SheetDock>
+              )}
 
               {/* Game Log Drawer Trigger */}
-              <div className="fixed bottom-4 right-4 z-[150]">
+              <div className="fixed bottom-4 right-4 z-[90]">
                 <Button 
                   onClick={() => setIsLogOpen(true)} 
                   className="bg-slate-800 text-white hover:bg-slate-700 shadow-xl border border-slate-600 flex items-center gap-2 px-6 py-4 rounded-full"
@@ -1547,20 +1400,19 @@ const MonopolyGame: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Bottom Drawer: Game Log — z-[200] ensures it renders above player token z-20 tokens */}
-      <Drawer open={isLogOpen} onOpenChange={setIsLogOpen}>
-        <DrawerContent className="max-h-[70vh] bg-slate-900 border-t border-slate-700 z-[200]">
-          <div className="mx-auto w-12 h-1 bg-slate-700 rounded-full my-4" />
-          <DrawerHeader>
-            <DrawerTitle className="text-white flex items-center justify-center gap-2 text-xl">
-              📜 Monopoly Game History
-            </DrawerTitle>
-          </DrawerHeader>
-          <div className="p-4 overflow-y-auto custom-scrollbar">
-            <GameLog events={gameState.gameEvents} players={gameState.players} />
-          </div>
-        </DrawerContent>
-      </Drawer>
+      {/* Game log (kit LogSheet) */}
+      {isLogOpen && (
+        <SheetDock>
+          <LogSheet
+            open
+            onClose={() => setIsLogOpen(false)}
+            entries={[...gameState.gameEvents].reverse().map(e => ({
+              id: e.id, player: e.player, message: e.message, amount: e.amount, type: e.type,
+              timeLabel: new Date(e.timestamp).toLocaleTimeString('en-US', { hour12: false })
+            }))}
+          />
+        </SheetDock>
+      )}
 
       {/* Game Editor Console for Active Game Editing */}
       <GameConsole

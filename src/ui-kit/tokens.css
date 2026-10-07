@@ -1,0 +1,103 @@
+/* Scoped, standalone styles; no existing Tailwind/shadcn rules are overridden globally. */
+.mma-ui { --mma-font-caption:12px; --mma-font-body:14px; --mma-font-action:16px; --mma-font-title:20px; --mma-font-headline:28px; --mma-font-money:36px; --mma-font-map:9px; --mma-space-1:4px; --mma-space-2:8px; --mma-space-3:12px; --mma-space-4:16px; --mma-space-6:24px; --mma-space-8:32px; --mma-radius-control:10px; --mma-radius-card:16px; --mma-radius-sheet:24px; --mma-shadow-card:0 8px 24px #02061766; --mma-shadow-sheet:0 24px 80px #020617aa; --mma-shadow-glow:0 0 24px #67e8f91a; --mma-touch-target:44px; }
+.mma-ui { --mma-canvas:#020617; --mma-surface:#0f172a; --mma-raised:#1e293b; --mma-border:#475569; --mma-text:#f1f5f9; --mma-muted:#cbd5e1; --mma-ink:#020617; --mma-info:#67e8f9; --mma-gain:#6ee7b7; --mma-loss:#fda4af; --mma-warning:#fcd34d; --mma-radius:16px; --mma-fast:120ms; --mma-normal:180ms; --mma-slow:240ms; color:var(--mma-text); font:400 14px/1.5 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; box-sizing:border-box; min-width:0; overflow-wrap:anywhere; }
+.mma-ui *, .mma-ui *::before, .mma-ui *::after { box-sizing:border-box; }
+.mma-ui h2,.mma-ui h3,.mma-ui p,.mma-ui ol { margin:0; }
+.mma-ui h2 { font-size:clamp(20px,4vw,28px); line-height:1.25; font-weight:750; letter-spacing:-.025em; }
+.mma-ui h3 { font-size:18px; line-height:1.35; font-weight:700; display:flex; align-items:center; gap:8px; }
+.mma-ui svg { flex-shrink:0; }
+.mma-ui button,.mma-ui input,.mma-ui select,.mma-ui textarea { font:inherit; }
+.mma-ui :focus-visible { outline:3px solid var(--mma-info); outline-offset:3px; }
+.mma-ui [tabindex="-1"]:focus { outline:none; }
+.mma-sr { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+.mma-ui .mma-muted,.mma-ui .mma-reason,.mma-ui .mma-eyebrow { color:var(--mma-muted); }
+.mma-ui .mma-eyebrow { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+.mma-ui .mma-tone-neutral { color:var(--mma-text); }
+.mma-ui .mma-tone-info { color:var(--mma-info); }
+.mma-ui .mma-tone-gain { color:var(--mma-gain); }
+.mma-ui .mma-tone-loss { color:var(--mma-loss); }
+.mma-ui .mma-tone-warning { color:var(--mma-warning); }
+.mma-currency { font-variant-numeric:tabular-nums; white-space:nowrap; font-weight:700; }
+.mma-money { font-size:clamp(28px,7vw,36px); line-height:1.2; letter-spacing:-.03em; padding:8px 0; }
+.mma-grow { min-width:0; flex:1; }
+.mma-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
+.mma-button-wrap { min-width:0; flex:1; }
+.mma-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-width:44px; min-height:44px; width:100%; padding:10px 14px; border:1px solid var(--mma-border); border-radius:10px; background:var(--mma-raised); color:var(--mma-text); cursor:pointer; font-weight:650; font-size:14px; white-space:normal; text-align:center; transition:opacity var(--mma-fast),transform var(--mma-fast); }
+.mma-button:hover:not(:disabled) { transform:translateY(-1px); }
+.mma-button:active:not(:disabled) { transform:translateY(0); }
+.mma-ui .mma-button-primary { background:var(--mma-info); color:var(--mma-ink); border-color:var(--mma-info); box-shadow:0 0 24px #67e8f91a; }
+.mma-ui .mma-button-danger { background:var(--mma-loss); color:var(--mma-ink); border-color:var(--mma-loss); }
+.mma-button:disabled { cursor:not-allowed; border-style:dashed; }
+.mma-button-primary .mma-currency,.mma-button-danger .mma-currency { color:var(--mma-ink)!important; }
+.mma-reason { font-size:14px; margin-top:6px!important; }
+.mma-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; }
+.mma-actions>.mma-button-wrap { flex:1 1 140px; }
+.mma-identity { background:var(--mma-surface); border:1px solid var(--mma-border); border-left:4px solid var(--mma-player,#475569); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; min-height:64px; }
+.mma-identity-sm { padding:8px; }
+.mma-identity-lg { padding:16px; }
+.mma-marker { width:28px; height:28px; border-radius:8px; flex-shrink:0; display:grid; place-items:center; font-size:14px; font-weight:800; }
+.mma-token { font-size:22px; flex-shrink:0; }
+.mma-identity-labels { display:flex; flex-wrap:wrap; align-items:center; gap:4px; color:var(--mma-muted); font-size:14px; }
+.mma-turn { position:sticky; top:0; z-index:20; background:var(--mma-surface); border:1px solid var(--mma-border); border-radius:16px; padding:12px 16px; display:flex; align-items:center; gap:12px; box-shadow:0 8px 24px #02061766; }
+.mma-timer { width:64px; height:64px; position:relative; flex-shrink:0; }
+.mma-timer svg { position:absolute; inset:0; width:64px; height:64px; transform:rotate(-90deg); fill:none; stroke-width:4; }
+.mma-ring-track { stroke:var(--mma-border); }
+.mma-ring-fill { stroke:currentColor; stroke-linecap:round; }
+.mma-timer strong { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:2px; font-size:18px; font-variant-numeric:tabular-nums; }
+.mma-timer strong span { font-size:12px; }
+.mma-stage-frame,.mma-sheet-frame { min-width:0; }
+.mma-stage,.mma-sheet { background:var(--mma-surface); border:1px solid var(--mma-border); border-radius:24px; width:100%; max-width:560px; margin:0 auto; max-height:88vh; max-height:88dvh; display:flex; flex-direction:column; box-shadow:0 24px 80px #020617aa; overflow:hidden; min-width:0; }
+.mma-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid var(--mma-border); flex-shrink:0; }
+.mma-panel-header>.mma-button-wrap { flex:0 0 44px; }
+.mma-panel-header .mma-button { padding:8px; }
+.mma-stage-subtitle { padding:12px 16px 0; color:var(--mma-muted); flex-shrink:0; }
+.mma-stage-body { padding:16px; overflow-y:auto; overscroll-behavior:contain; min-height:0; display:flex; flex-direction:column; gap:16px; }
+.mma-stage-footer { padding:12px 16px max(16px,env(safe-area-inset-bottom)); background:var(--mma-surface); border-top:1px solid var(--mma-border); position:sticky; bottom:0; flex-shrink:0; z-index:1; }
+.mma-sheet { max-width:480px; }
+.mma-sheet-frame { width:100%; }
+.mma-dialog-content { display:flex; flex-direction:column; gap:16px; }
+.mma-fact { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:10px 0; border-bottom:1px solid var(--mma-border); }
+.mma-fact>span { color:var(--mma-muted); }
+.mma-notice { border:1px solid var(--mma-border); border-radius:12px; padding:12px; display:flex; align-items:flex-start; gap:8px; background:var(--mma-raised); }
+.mma-auction { display:flex; flex-direction:column; gap:16px; }
+.mma-auction-bid { padding:16px; border:1px solid var(--mma-border); border-radius:16px; background:var(--mma-raised); }
+.mma-status { display:flex; align-items:center; gap:8px; font-weight:700; }
+.mma-quick-bids { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr)); gap:10px; }
+.mma-tile { position:relative; border:1px solid var(--mma-border); border-radius:10px; overflow:hidden; background:var(--mma-surface); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:10px 6px 8px; text-align:center; min-height:64px; min-width:44px; width:100%; color:var(--mma-text); }
+button.mma-tile { cursor:pointer; }
+.mma-tile[aria-pressed="true"] { outline:3px solid var(--mma-info); outline-offset:2px; }
+.mma-tile-group { position:absolute; top:0; left:0; right:0; height:5px; }
+.mma-tile-code { font-size:14px; font-weight:750; }
+.mma-tile-full { min-height:150px; padding:16px 10px; }
+.mma-tile-state,.mma-tile-team,.mma-tile-tokens { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:4px; }
+.mma-tile-state { font-weight:800; }
+.mma-tile-owner { border-left:4px solid; padding-left:5px; font-size:14px; }
+.mma-tile-map .mma-tile-code,.mma-tile-map .mma-tile-owner,.mma-tile-map .mma-tile-state { font-size:12px; }
+.mma-tile-map .mma-tile-tokens { font-size:12px; }
+.mma-tile-mortgaged { background:repeating-linear-gradient(135deg,#0f172a 0 8px,#1e293b 8px 10px); }
+.mma-tile-inactive { background:#1e293b; border-style:dashed; }
+.mma-tile-team { padding:2px 4px; border:1px solid var(--mma-border); border-radius:6px; background:var(--mma-raised); }
+.mma-selected { display:flex; align-items:center; gap:12px; padding:16px; border:1px solid var(--mma-border); border-radius:16px; background:var(--mma-surface); }
+.mma-selected>.mma-button-wrap { flex:0 1 90px; }
+.mma-list { display:flex; flex-direction:column; gap:12px; padding:0; list-style:none; }
+.mma-list-card { border:1px solid var(--mma-border); border-radius:12px; background:var(--mma-raised); padding:14px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+.mma-list-card .mma-identity { width:100%; }
+.mma-fieldset { border:1px solid var(--mma-border); border-radius:12px; min-width:0; margin:0; padding:12px; display:flex; flex-direction:column; gap:10px; }
+.mma-fieldset legend { font-weight:750; padding:0 4px; }
+.mma-choice { display:flex; align-items:center; gap:10px; min-height:44px; padding:8px 0; cursor:pointer; }
+.mma-choice input { width:44px; height:44px; flex-shrink:0; accent-color:var(--mma-info); margin:0; }
+.mma-label { display:block; font-weight:650; margin-bottom:6px; }
+.mma-input { width:100%; min-width:44px; min-height:44px; border:1px solid var(--mma-border); border-radius:10px; padding:10px 12px; background:var(--mma-canvas); color:var(--mma-text); }
+.mma-color-input { padding:4px; height:48px; }
+.mma-trade-sides { display:grid; grid-template-columns:1fr; gap:16px; }
+.mma-game-over,.mma-waiting { max-width:680px; margin:0 auto; padding:20px; border:1px solid var(--mma-border); border-radius:24px; background:var(--mma-surface); display:flex; flex-direction:column; gap:20px; }
+.mma-game-over .mma-standings .mma-row>.mma-identity { flex:1; }
+.mma-room-code { margin:16px 0; border:1px solid var(--mma-border); border-radius:16px; padding:12px; display:flex; gap:12px; align-items:center; }
+.mma-room-code>div:first-child { flex:1; min-width:0; }
+.mma-room-code strong { display:block; font-size:24px; letter-spacing:.12em; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.mma-room-code .mma-button-wrap { flex:0 1 100px; }
+.mma-waiting-footer { position:sticky; bottom:0; display:flex; flex-wrap:wrap; gap:10px; background:var(--mma-surface); padding:12px 0 max(0px,env(safe-area-inset-bottom)); border-top:1px solid var(--mma-border); }
+@media(max-width:639px) { .mma-stage-frame,.mma-sheet-frame { position:fixed; inset:0; z-index:100; background:#020617aa; display:flex; align-items:flex-end; }.mma-stage,.mma-sheet { margin:0; max-width:none; border-radius:24px 24px 0 0; }.mma-stage-footer .mma-actions { flex-direction:column; }.mma-stage-footer .mma-actions>.mma-button-wrap { flex:auto; width:100%; }.mma-game-over,.mma-waiting { padding:16px; }.mma-selected { flex-wrap:wrap; } }
+@media(min-width:640px) { .mma-stage-frame { display:grid; place-items:center; min-height:420px; padding:16px; }.mma-trade-sides { grid-template-columns:1fr 1fr; }.mma-sheet-frame { max-width:480px; } }
+@media(prefers-reduced-motion:reduce) { .mma-ui { --mma-fast:0ms; --mma-normal:0ms; --mma-slow:0ms; }.mma-ui *, .mma-ui *::before,.mma-ui *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }.mma-ui .mma-button:hover { transform:none; } }
+.mma-ui.mma-currency { font-size: inherit; line-height: inherit; }
