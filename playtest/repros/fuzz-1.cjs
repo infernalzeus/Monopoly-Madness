@@ -1,0 +1,1 @@
+require('node:child_process').spawnSync(process.execPath,[require('node:path').join(__dirname,'../fuzz.cjs'),'--repro',require('node:path').join(__dirname,'fuzz-1.json')],{stdio:'inherit'}).status && (process.exitCode=1);

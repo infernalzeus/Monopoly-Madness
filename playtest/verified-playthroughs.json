@@ -1,0 +1,10 @@
+{
+  "note": "Successful individual emulator runs before the final batch; recorded from their observed console output. Browser clocks accelerated; normal multiplayer seats provisioned through Admin because PT01 blocks new joining.",
+  "runs": [
+    {"name":"standard-3-timer-off","turn":150,"rolls":134,"actions":256,"snapshots":369,"seconds":119.3492105},
+    {"name":"auctions-draft-3-timer30","turn":150,"rolls":141,"actions":271,"snapshots":433,"seconds":167.189},
+    {"name":"workers-teams-3","turn":150,"rolls":135,"actions":249,"snapshots":354,"seconds":137.1277893},
+    {"name":"mortgage-3","turn":150,"rolls":138,"actions":260,"snapshots":365,"seconds":141.7020073},
+    {"name":"bot-draft-false","turn":150,"rolls":62,"actions":119,"snapshots":402,"seconds":125.3532262,"seatsCreatedByRealUI":true}
+  ]
+}

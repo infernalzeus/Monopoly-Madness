@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import {
-  WorkersSheet, TeamsSheet, PlayerSheet, SelectedTileSummary, formatCurrency,
-  type WorkerAssignment, type TeamSummary, type PortfolioProperty, type PlayerIdentityProps
+  WorkersSheet, TeamsSheet, SelectedTileSummary,
+  type WorkerAssignment, type TeamSummary, type PlayerIdentityProps
 } from '@/ui-kit';
-import { computeRent, mortgagePayout, unmortgageCost } from '@/gameEngine/core';
+import { computeRent } from '@/gameEngine/core';
+import { CardRail, JailCard } from '@/ui-kit/cards';
+import { SheetShell, Fact, CurrencyAmount, PlayerIdentity } from '@/ui-kit';
+import { cardProps, identityOf, type CardCtx } from './cardAdapters';
 import type { GameState, Player, Property } from '@/types/game';
 
 const identity = (p: Player, index: number, me: Player): PlayerIdentityProps => ({
@@ -82,42 +85,41 @@ export const TeamsHost: React.FC<TeamsHostProps> = ({ gameState, me, onClose, jo
   );
 };
 
-/* ───────────────────────── Portfolio ───────────────────────── */
-interface PortfolioHostProps {
-  gameState: GameState; me: Player; isMyTurn: boolean; onClose: () => void;
-  mortgageProperty: (id: string) => void; unmortgageProperty: (id: string) => void;
-}
-export const PortfolioHost: React.FC<PortfolioHostProps> = ({ gameState, me, isMyTurn, onClose, mortgageProperty, unmortgageProperty }) => {
+/* ───────────────────────── Portfolio (property cards) ───────────────────────── */
+/** The player's properties as inspectable cards (rail on phones, fan on desktop). Presentation order is local UI state. */
+export const PortfolioCards: React.FC<{ ctx: CardCtx; spendJailCard?: () => void }> = ({ ctx, spendJailCard }) => {
   const [order, setOrder] = useState<string[]>([]);
-  const owned = gameState.properties.filter(p => p.owner === me.name);
+  const { state, me } = ctx;
+  const owned = state.properties.filter(p => p.owner === me.name);
   const sorted = [...owned].sort((a, b) => {
     const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
     return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.position - b.position;
   });
-  const rank = 1 + gameState.players.filter(p => p.isActive && !p.isSpectator && netWorthOf(gameState, p) > netWorthOf(gameState, me)).length;
-  const mortgageOn = gameState.settings.mortgageEnabled;
-
-  const properties: PortfolioProperty[] = sorted.map(p => {
-    const base = { id: p.id, name: p.name, group: p.colorGroup, value: p.currentValue, isMortgaged: p.isMortgaged, isInactive: p.isInactive, ...rentOf(gameState, p) };
-    if (p.isInactive) return base;
-    if (!mortgageOn) return { ...base, disabledReason: 'Mortgage is off in this game.' };
-    if (p.isMortgaged) {
-      const cost = unmortgageCost(p);
-      return { ...base, actionLabel: `Unmortgage −${formatCurrency(cost)}`, disabledReason: !isMyTurn ? 'Only on your turn.' : me.balance < cost ? 'Not enough cash.' : undefined };
-    }
-    return {
-      ...base, actionLabel: `Mortgage +${formatCurrency(mortgagePayout(p))}`,
-      disabledReason: !isMyTurn ? 'Only on your turn.' : p.houses > 0 || p.hasHotel ? 'Sell the buildings first.' : undefined
-    };
-  });
-
   return (
-    <PlayerSheet
-      player={identity(me, gameState.players.indexOf(me), me)} balance={me.balance} netWorth={netWorthOf(gameState, me)} rank={rank}
-      properties={properties} open onClose={onClose}
-      onPropertyAction={id => { const p = gameState.properties.find(x => x.id === id); if (p) (p.isMortgaged ? unmortgageProperty : mortgageProperty)(id); }}
-      onReorder={setOrder}
-    />
+    <>
+      {(me.jailCards || 0) > 0 && <JailCard count={me.jailCards || 0} onUse={me.isInJail && ctx.isMyTurn ? spendJailCard : undefined} />}
+      {sorted.length === 0
+        ? <p className="mma-ui mma-muted">You don't own any properties yet — land on one and buy it, or win one at auction.</p>
+        : <CardRail cards={sorted.map(p => cardProps(ctx, p, 'hand'))} onReorder={setOrder} label="Your property cards" />}
+    </>
+  );
+};
+
+interface PortfolioHostProps { ctx: CardCtx; onClose: () => void; spendJailCard?: () => void }
+export const PortfolioHost: React.FC<PortfolioHostProps> = ({ ctx, onClose, spendJailCard }) => {
+  const { state, me } = ctx;
+  const worth = (p: Player) => netWorthOf(state, p);
+  const rank = 1 + state.players.filter(p => p.isActive && !p.isSpectator && worth(p) > worth(me)).length;
+  return (
+    <SheetShell title="Your portfolio" open onClose={onClose}>
+      <PlayerIdentity {...identityOf(state, me, me)} />
+      <div className="mma-facts">
+        <Fact label="Cash"><CurrencyAmount amount={me.balance} /></Fact>
+        <Fact label="Net worth"><CurrencyAmount amount={worth(me)} /></Fact>
+        <Fact label="Rank">#{rank}</Fact>
+      </div>
+      <PortfolioCards ctx={ctx} spendJailCard={spendJailCard} />
+    </SheetShell>
   );
 };
 

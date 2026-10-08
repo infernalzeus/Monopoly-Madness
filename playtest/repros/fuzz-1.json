@@ -1,0 +1,2283 @@
+{
+  "seed": 13,
+  "initial": {
+    "properties": [
+      {
+        "id": "prop-0",
+        "name": "GO",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 0,
+        "description": "GO — Special"
+      },
+      {
+        "id": "prop-1",
+        "name": "London",
+        "type": "property",
+        "colorGroup": "brown",
+        "baseValue": 20000,
+        "currentValue": 20000,
+        "rent": [
+          2000,
+          10000,
+          30000,
+          90000,
+          160000,
+          250000
+        ],
+        "mortgageValue": 10000,
+        "houseCost": 10000,
+        "hotelCost": 10000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 1,
+        "description": "London — Property"
+      },
+      {
+        "id": "prop-2",
+        "name": "Community Chest",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 2,
+        "description": "Community Chest — Special"
+      },
+      {
+        "id": "prop-3",
+        "name": "Paris",
+        "type": "property",
+        "colorGroup": "brown",
+        "baseValue": 40000,
+        "currentValue": 40000,
+        "rent": [
+          4000,
+          20000,
+          60000,
+          180000,
+          320000,
+          450000
+        ],
+        "mortgageValue": 20000,
+        "houseCost": 20000,
+        "hotelCost": 20000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 3,
+        "description": "Paris — Property"
+      },
+      {
+        "id": "prop-4",
+        "name": "Income Tax",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 4,
+        "description": "Income Tax — Special"
+      },
+      {
+        "id": "prop-5",
+        "name": "Orient Express",
+        "type": "railroad",
+        "colorGroup": null,
+        "baseValue": 200000,
+        "currentValue": 200000,
+        "rent": [
+          25000,
+          50000,
+          100000,
+          200000
+        ],
+        "mortgageValue": 100000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 5,
+        "description": "Orient Express — Railroad"
+      },
+      {
+        "id": "prop-6",
+        "name": "New York",
+        "type": "property",
+        "colorGroup": "lightBlue",
+        "baseValue": 60000,
+        "currentValue": 60000,
+        "rent": [
+          6000,
+          30000,
+          90000,
+          270000,
+          400000,
+          550000
+        ],
+        "mortgageValue": 30000,
+        "houseCost": 30000,
+        "hotelCost": 30000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 6,
+        "description": "New York — Property",
+        "owner": "P1"
+      },
+      {
+        "id": "prop-7",
+        "name": "Chance",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 7,
+        "description": "Chance — Special"
+      },
+      {
+        "id": "prop-8",
+        "name": "Chicago",
+        "type": "property",
+        "colorGroup": "lightBlue",
+        "baseValue": 60000,
+        "currentValue": 60000,
+        "rent": [
+          6000,
+          30000,
+          90000,
+          270000,
+          400000,
+          550000
+        ],
+        "mortgageValue": 30000,
+        "houseCost": 30000,
+        "hotelCost": 30000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 8,
+        "description": "Chicago — Property",
+        "owner": "P1"
+      },
+      {
+        "id": "prop-9",
+        "name": "Los Angeles",
+        "type": "property",
+        "colorGroup": "lightBlue",
+        "baseValue": 80000,
+        "currentValue": 80000,
+        "rent": [
+          8000,
+          40000,
+          100000,
+          300000,
+          450000,
+          600000
+        ],
+        "mortgageValue": 40000,
+        "houseCost": 40000,
+        "hotelCost": 40000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 9,
+        "description": "Los Angeles — Property",
+        "owner": "P1"
+      },
+      {
+        "id": "prop-10",
+        "name": "Jail",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 10,
+        "description": "Jail — Special"
+      },
+      {
+        "id": "prop-11",
+        "name": "Tokyo",
+        "type": "property",
+        "colorGroup": "pink",
+        "baseValue": 100000,
+        "currentValue": 100000,
+        "rent": [
+          10000,
+          50000,
+          150000,
+          450000,
+          625000,
+          750000
+        ],
+        "mortgageValue": 50000,
+        "houseCost": 50000,
+        "hotelCost": 50000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 11,
+        "description": "Tokyo — Property",
+        "owner": "P2"
+      },
+      {
+        "id": "prop-12",
+        "name": "Power Grid",
+        "type": "utility",
+        "colorGroup": null,
+        "baseValue": 150000,
+        "currentValue": 150000,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 75000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 12,
+        "description": "Power Grid — Utility"
+      },
+      {
+        "id": "prop-13",
+        "name": "Seoul",
+        "type": "property",
+        "colorGroup": "pink",
+        "baseValue": 100000,
+        "currentValue": 100000,
+        "rent": [
+          10000,
+          50000,
+          150000,
+          450000,
+          625000,
+          750000
+        ],
+        "mortgageValue": 50000,
+        "houseCost": 50000,
+        "hotelCost": 50000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 13,
+        "description": "Seoul — Property",
+        "owner": "P2"
+      },
+      {
+        "id": "prop-14",
+        "name": "Osaka",
+        "type": "property",
+        "colorGroup": "pink",
+        "baseValue": 120000,
+        "currentValue": 120000,
+        "rent": [
+          12000,
+          60000,
+          180000,
+          500000,
+          700000,
+          900000
+        ],
+        "mortgageValue": 60000,
+        "houseCost": 60000,
+        "hotelCost": 60000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 14,
+        "description": "Osaka — Property",
+        "owner": "P2"
+      },
+      {
+        "id": "prop-15",
+        "name": "Trans-Siberian Rail",
+        "type": "railroad",
+        "colorGroup": null,
+        "baseValue": 200000,
+        "currentValue": 200000,
+        "rent": [
+          25000,
+          50000,
+          100000,
+          200000
+        ],
+        "mortgageValue": 100000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 15,
+        "description": "Trans-Siberian Rail — Railroad"
+      },
+      {
+        "id": "prop-16",
+        "name": "Dubai",
+        "type": "property",
+        "colorGroup": "orange",
+        "baseValue": 140000,
+        "currentValue": 140000,
+        "rent": [
+          14000,
+          70000,
+          200000,
+          550000,
+          750000,
+          950000
+        ],
+        "mortgageValue": 70000,
+        "houseCost": 70000,
+        "hotelCost": 70000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 16,
+        "description": "Dubai — Property",
+        "owner": "P3"
+      },
+      {
+        "id": "prop-17",
+        "name": "Community Chest",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 17,
+        "description": "Community Chest — Special"
+      },
+      {
+        "id": "prop-18",
+        "name": "Abu Dhabi",
+        "type": "property",
+        "colorGroup": "orange",
+        "baseValue": 140000,
+        "currentValue": 140000,
+        "rent": [
+          14000,
+          70000,
+          200000,
+          550000,
+          750000,
+          950000
+        ],
+        "mortgageValue": 70000,
+        "houseCost": 70000,
+        "hotelCost": 70000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 18,
+        "description": "Abu Dhabi — Property",
+        "owner": "P3"
+      },
+      {
+        "id": "prop-19",
+        "name": "Doha",
+        "type": "property",
+        "colorGroup": "orange",
+        "baseValue": 160000,
+        "currentValue": 160000,
+        "rent": [
+          16000,
+          80000,
+          220000,
+          600000,
+          800000,
+          1000000
+        ],
+        "mortgageValue": 80000,
+        "houseCost": 80000,
+        "hotelCost": 80000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 19,
+        "description": "Doha — Property",
+        "owner": "P3"
+      },
+      {
+        "id": "prop-20",
+        "name": "Free Parking",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 20,
+        "description": "Free Parking — Special"
+      },
+      {
+        "id": "prop-21",
+        "name": "Moscow",
+        "type": "property",
+        "colorGroup": "red",
+        "baseValue": 180000,
+        "currentValue": 180000,
+        "rent": [
+          18000,
+          90000,
+          250000,
+          700000,
+          875000,
+          1050000
+        ],
+        "mortgageValue": 90000,
+        "houseCost": 90000,
+        "hotelCost": 90000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 21,
+        "description": "Moscow — Property"
+      },
+      {
+        "id": "prop-22",
+        "name": "Chance",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 22,
+        "description": "Chance — Special"
+      },
+      {
+        "id": "prop-23",
+        "name": "Berlin",
+        "type": "property",
+        "colorGroup": "red",
+        "baseValue": 180000,
+        "currentValue": 180000,
+        "rent": [
+          18000,
+          90000,
+          250000,
+          700000,
+          875000,
+          1050000
+        ],
+        "mortgageValue": 90000,
+        "houseCost": 90000,
+        "hotelCost": 90000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 23,
+        "description": "Berlin — Property"
+      },
+      {
+        "id": "prop-24",
+        "name": "Rome",
+        "type": "property",
+        "colorGroup": "red",
+        "baseValue": 200000,
+        "currentValue": 200000,
+        "rent": [
+          20000,
+          100000,
+          300000,
+          750000,
+          925000,
+          1100000
+        ],
+        "mortgageValue": 100000,
+        "houseCost": 100000,
+        "hotelCost": 100000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 24,
+        "description": "Rome — Property"
+      },
+      {
+        "id": "prop-25",
+        "name": "Pan-Pacific Express",
+        "type": "railroad",
+        "colorGroup": null,
+        "baseValue": 200000,
+        "currentValue": 200000,
+        "rent": [
+          25000,
+          50000,
+          100000,
+          200000
+        ],
+        "mortgageValue": 100000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 25,
+        "description": "Pan-Pacific Express — Railroad"
+      },
+      {
+        "id": "prop-26",
+        "name": "Sydney",
+        "type": "property",
+        "colorGroup": "yellow",
+        "baseValue": 220000,
+        "currentValue": 220000,
+        "rent": [
+          22000,
+          110000,
+          330000,
+          800000,
+          975000,
+          1150000
+        ],
+        "mortgageValue": 110000,
+        "houseCost": 110000,
+        "hotelCost": 110000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 26,
+        "description": "Sydney — Property",
+        "owner": "P5"
+      },
+      {
+        "id": "prop-27",
+        "name": "Melbourne",
+        "type": "property",
+        "colorGroup": "yellow",
+        "baseValue": 220000,
+        "currentValue": 220000,
+        "rent": [
+          22000,
+          110000,
+          330000,
+          800000,
+          975000,
+          1150000
+        ],
+        "mortgageValue": 110000,
+        "houseCost": 110000,
+        "hotelCost": 110000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 27,
+        "description": "Melbourne — Property",
+        "owner": "P5"
+      },
+      {
+        "id": "prop-28",
+        "name": "Waterworks",
+        "type": "utility",
+        "colorGroup": null,
+        "baseValue": 150000,
+        "currentValue": 150000,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 75000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 28,
+        "description": "Waterworks — Utility"
+      },
+      {
+        "id": "prop-29",
+        "name": "Brisbane",
+        "type": "property",
+        "colorGroup": "yellow",
+        "baseValue": 240000,
+        "currentValue": 240000,
+        "rent": [
+          24000,
+          120000,
+          360000,
+          850000,
+          1025000,
+          1200000
+        ],
+        "mortgageValue": 120000,
+        "houseCost": 120000,
+        "hotelCost": 120000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 29,
+        "description": "Brisbane — Property",
+        "owner": "P5"
+      },
+      {
+        "id": "prop-30",
+        "name": "Go to Jail",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 30,
+        "description": "Go to Jail — Special"
+      },
+      {
+        "id": "prop-31",
+        "name": "São Paulo",
+        "type": "property",
+        "colorGroup": "green",
+        "baseValue": 260000,
+        "currentValue": 260000,
+        "rent": [
+          26000,
+          130000,
+          390000,
+          900000,
+          1100000,
+          1275000
+        ],
+        "mortgageValue": 130000,
+        "houseCost": 130000,
+        "hotelCost": 130000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 31,
+        "description": "São Paulo — Property"
+      },
+      {
+        "id": "prop-32",
+        "name": "Buenos Aires",
+        "type": "property",
+        "colorGroup": "green",
+        "baseValue": 260000,
+        "currentValue": 260000,
+        "rent": [
+          26000,
+          130000,
+          390000,
+          900000,
+          1100000,
+          1275000
+        ],
+        "mortgageValue": 130000,
+        "houseCost": 130000,
+        "hotelCost": 130000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 32,
+        "description": "Buenos Aires — Property"
+      },
+      {
+        "id": "prop-33",
+        "name": "Community Chest",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 33,
+        "description": "Community Chest — Special"
+      },
+      {
+        "id": "prop-34",
+        "name": "Mexico City",
+        "type": "property",
+        "colorGroup": "green",
+        "baseValue": 280000,
+        "currentValue": 280000,
+        "rent": [
+          28000,
+          150000,
+          450000,
+          1000000,
+          1200000,
+          1400000
+        ],
+        "mortgageValue": 140000,
+        "houseCost": 140000,
+        "hotelCost": 140000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 34,
+        "description": "Mexico City — Property"
+      },
+      {
+        "id": "prop-35",
+        "name": "Trans-Atlantic Rail",
+        "type": "railroad",
+        "colorGroup": null,
+        "baseValue": 200000,
+        "currentValue": 200000,
+        "rent": [
+          25000,
+          50000,
+          100000,
+          200000
+        ],
+        "mortgageValue": 100000,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 35,
+        "description": "Trans-Atlantic Rail — Railroad"
+      },
+      {
+        "id": "prop-36",
+        "name": "Chance",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 36,
+        "description": "Chance — Special"
+      },
+      {
+        "id": "prop-37",
+        "name": "Singapore",
+        "type": "property",
+        "colorGroup": "darkBlue",
+        "baseValue": 350000,
+        "currentValue": 350000,
+        "rent": [
+          35000,
+          175000,
+          500000,
+          1100000,
+          1300000,
+          1500000
+        ],
+        "mortgageValue": 175000,
+        "houseCost": 175000,
+        "hotelCost": 175000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 37,
+        "description": "Singapore — Property",
+        "owner": "P7"
+      },
+      {
+        "id": "prop-38",
+        "name": "Luxury Tax",
+        "type": "special",
+        "colorGroup": null,
+        "baseValue": 0,
+        "currentValue": 0,
+        "rent": [
+          0
+        ],
+        "mortgageValue": 0,
+        "houseCost": null,
+        "hotelCost": null,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": false,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 38,
+        "description": "Luxury Tax — Special"
+      },
+      {
+        "id": "prop-39",
+        "name": "Hong Kong",
+        "type": "property",
+        "colorGroup": "darkBlue",
+        "baseValue": 500000,
+        "currentValue": 500000,
+        "rent": [
+          50000,
+          200000,
+          600000,
+          1400000,
+          1700000,
+          2000000
+        ],
+        "mortgageValue": 250000,
+        "houseCost": 250000,
+        "hotelCost": 250000,
+        "houses": 0,
+        "hasHotel": false,
+        "isOwned": true,
+        "isMortgaged": false,
+        "isInAuction": false,
+        "isInactive": false,
+        "position": 39,
+        "description": "Hong Kong — Property",
+        "owner": "P7"
+      }
+    ],
+    "players": [
+      {
+        "id": "player-1",
+        "name": "P0",
+        "balance": 1023318,
+        "properties": [],
+        "position": 18,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false,
+        "teamId": "t1"
+      },
+      {
+        "id": "player-2",
+        "name": "P1",
+        "balance": 2462223,
+        "properties": [
+          "prop-6",
+          "prop-8",
+          "prop-9"
+        ],
+        "position": 5,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false,
+        "teamId": "t1"
+      },
+      {
+        "id": "player-3",
+        "name": "P2",
+        "balance": 444416,
+        "properties": [
+          "prop-11",
+          "prop-13",
+          "prop-14"
+        ],
+        "position": 13,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      },
+      {
+        "id": "player-4",
+        "name": "P3",
+        "balance": 3141622,
+        "properties": [
+          "prop-16",
+          "prop-18",
+          "prop-19"
+        ],
+        "position": 22,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      },
+      {
+        "id": "player-5",
+        "name": "P4",
+        "balance": 663224,
+        "properties": [],
+        "position": 13,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      },
+      {
+        "id": "player-6",
+        "name": "P5",
+        "balance": 2385476,
+        "properties": [
+          "prop-26",
+          "prop-27",
+          "prop-29"
+        ],
+        "position": 25,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      },
+      {
+        "id": "player-7",
+        "name": "P6",
+        "balance": 1239075,
+        "properties": [],
+        "position": 10,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      },
+      {
+        "id": "player-8",
+        "name": "P7",
+        "balance": 3224988,
+        "properties": [
+          "prop-37",
+          "prop-39"
+        ],
+        "position": 22,
+        "color": "#06B6D4",
+        "isActive": true,
+        "isInJail": false,
+        "jailTurns": 0,
+        "pieceIcon": "🔵",
+        "discoveredProperties": [
+          0
+        ],
+        "isBot": false
+      }
+    ],
+    "teams": [
+      {
+        "id": "t1",
+        "name": "First alliance",
+        "members": [
+          "player-1",
+          "player-2"
+        ],
+        "sharedBalance": 0,
+        "color": "#67e8f9"
+      }
+    ],
+    "currentAuction": null,
+    "settings": {
+      "gameMode": "console",
+      "auctionsEnabled": false,
+      "teamsEnabled": true,
+      "mortgageEnabled": false,
+      "tradingEnabled": false,
+      "auctionDuration": 2,
+      "turnTimerDuration": 0,
+      "maxPlayers": 8,
+      "startingBalance": 10000000,
+      "passGoReward": 1000000,
+      "jailFine": 500000,
+      "allowPropertyEditing": true,
+      "isPrivate": false,
+      "gameType": "standard",
+      "blindPickEnabled": true,
+      "preAuctionProperties": [],
+      "customPropertyLists": {
+        "brown": [
+          "prop-1",
+          "prop-3"
+        ],
+        "lightBlue": [
+          "prop-6",
+          "prop-8",
+          "prop-9"
+        ],
+        "pink": [
+          "prop-11",
+          "prop-13",
+          "prop-14"
+        ],
+        "orange": [
+          "prop-16",
+          "prop-18",
+          "prop-19"
+        ],
+        "red": [
+          "prop-21",
+          "prop-23",
+          "prop-24"
+        ],
+        "yellow": [
+          "prop-26",
+          "prop-27",
+          "prop-29"
+        ],
+        "green": [
+          "prop-31",
+          "prop-32",
+          "prop-34"
+        ],
+        "darkBlue": [
+          "prop-37",
+          "prop-39"
+        ],
+        "railroads": [
+          "prop-5",
+          "prop-15",
+          "prop-25",
+          "prop-35"
+        ],
+        "utilities": [
+          "prop-12",
+          "prop-28"
+        ]
+      },
+      "workersEnabled": true,
+      "freeParkingPot": false,
+      "supplyLimits": true
+    },
+    "gamePhase": "playing",
+    "turn": 0,
+    "currentPlayer": "player-1",
+    "lastDiceRoll": null,
+    "gameEvents": [],
+    "doubleCount": 0,
+    "turnEndTime": null,
+    "pendingPurchase": null,
+    "winnerId": null,
+    "turnState": "waiting_for_roll",
+    "preAuctionPhase": false,
+    "consoleOpen": true,
+    "tradeOffers": [],
+    "pendingRent": null,
+    "pendingCard": null,
+    "workers": []
+  },
+  "actions": [
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-1",
+      "id": 0,
+      "at": 1800000001000,
+      "rng": 13
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 2,
+      "at": 1800000003000,
+      "rng": 640292241
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 3,
+      "at": 1800000004000,
+      "rng": 206754236
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 5,
+      "at": 1800000006000,
+      "rng": 520012464
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-3",
+      "id": 7,
+      "at": 1800000008000,
+      "rng": 2985684834
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 9,
+      "at": 1800000010000,
+      "rng": 4187576246
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 10,
+      "at": 1800000011000,
+      "rng": 2465262493
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-4",
+      "id": 12,
+      "at": 1800000013000,
+      "rng": 742289953
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 13,
+      "at": 1800000014000,
+      "rng": 2186077452
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 14,
+      "at": 1800000015000,
+      "rng": 770490085
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 16,
+      "at": 1800000017000,
+      "rng": 38566495
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-34"
+      ],
+      "actor": "player-6",
+      "id": 17,
+      "at": 1800000018000,
+      "rng": 4214154804
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-7",
+      "id": 18,
+      "at": 1800000019000,
+      "rng": 4217426310
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-7",
+      "id": 19,
+      "at": 1800000020000,
+      "rng": 1116480999
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 20,
+      "at": 1800000021000,
+      "rng": 2667328177
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-8",
+      "id": 21,
+      "at": 1800000022000,
+      "rng": 2819252718
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-1",
+      "id": 22,
+      "at": 1800000023000,
+      "rng": 3211548496
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-1",
+      "id": 23,
+      "at": 1800000024000,
+      "rng": 219474041
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 24,
+      "at": 1800000025000,
+      "rng": 656481555
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-2",
+      "id": 25,
+      "at": 1800000026000,
+      "rng": 715170040
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-3",
+      "id": 26,
+      "at": 1800000027000,
+      "rng": 2742258922
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 28,
+      "at": 1800000029000,
+      "rng": 1479363006
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 29,
+      "at": 1800000030000,
+      "rng": 4121650693
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-4",
+      "id": 30,
+      "at": 1800000031000,
+      "rng": 3749289737
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 31,
+      "at": 1800000032000,
+      "rng": 481911331
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-24"
+      ],
+      "actor": "player-5",
+      "id": 32,
+      "at": 1800000033000,
+      "rng": 2961404744
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 35,
+      "at": 1800000036000,
+      "rng": 2370397582
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-6",
+      "id": 36,
+      "at": 1800000037000,
+      "rng": 1208367513
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 39,
+      "at": 1800000040000,
+      "rng": 3355711896
+    },
+    {
+      "name": "assignWorker",
+      "args": [
+        "prop-37",
+        "#ffe5b4"
+      ],
+      "actor": "player-8",
+      "id": 40,
+      "at": 1800000041000,
+      "rng": 2259603479
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 41,
+      "at": 1800000042000,
+      "rng": 2575813729
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-8",
+      "id": 42,
+      "at": 1800000043000,
+      "rng": 757636389
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 45,
+      "at": 1800000046000,
+      "rng": 18464966
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 52,
+      "at": 1800000053000,
+      "rng": 3974497476
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-3",
+      "id": 53,
+      "at": 1800000054000,
+      "rng": 1629964627
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-3",
+      "id": 54,
+      "at": 1800000055000,
+      "rng": 2352144952
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 55,
+      "at": 1800000056000,
+      "rng": 2725486634
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-4",
+      "id": 56,
+      "at": 1800000057000,
+      "rng": 1163187035
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 57,
+      "at": 1800000058000,
+      "rng": 836169982
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-5",
+      "id": 58,
+      "at": 1800000059000,
+      "rng": 2478778047
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 59,
+      "at": 1800000060000,
+      "rng": 3842570772
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 60,
+      "at": 1800000061000,
+      "rng": 28597831
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 62,
+      "at": 1800000063000,
+      "rng": 1186307132
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 66,
+      "at": 1800000067000,
+      "rng": 1868134259
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 69,
+      "at": 1800000070000,
+      "rng": 1084712609
+    },
+    {
+      "name": "buildHouse",
+      "args": [
+        "prop-39"
+      ],
+      "actor": "player-8",
+      "id": 70,
+      "at": 1800000071000,
+      "rng": 1032605580
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 71,
+      "at": 1800000072000,
+      "rng": 149734779
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-8",
+      "id": 73,
+      "at": 1800000074000,
+      "rng": 157952735
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 75,
+      "at": 1800000076000,
+      "rng": 2507010054
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 78,
+      "at": 1800000079000,
+      "rng": 3833403100
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 79,
+      "at": 1800000080000,
+      "rng": 2138032592
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 81,
+      "at": 1800000082000,
+      "rng": 1780687746
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 82,
+      "at": 1800000083000,
+      "rng": 3629956566
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-3",
+      "id": 83,
+      "at": 1800000084000,
+      "rng": 3064847165
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 84,
+      "at": 1800000085000,
+      "rng": 3374025665
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 90,
+      "at": 1800000091000,
+      "rng": 3299828617
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-4",
+      "id": 91,
+      "at": 1800000092000,
+      "rng": 785792934
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 92,
+      "at": 1800000093000,
+      "rng": 133158344
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 94,
+      "at": 1800000095000,
+      "rng": 2806047100
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 97,
+      "at": 1800000098000,
+      "rng": 3283815445
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-6",
+      "id": 98,
+      "at": 1800000099000,
+      "rng": 3642806562
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 101,
+      "at": 1800000102000,
+      "rng": 2285039197
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 102,
+      "at": 1800000103000,
+      "rng": 3105037336
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-8",
+      "id": 104,
+      "at": 1800000105000,
+      "rng": 3699238092
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 107,
+      "at": 1800000108000,
+      "rng": 649552671
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 112,
+      "at": 1800000113000,
+      "rng": 4123080296
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-3",
+      "id": 113,
+      "at": 1800000114000,
+      "rng": 51652263
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-3"
+      ],
+      "actor": "player-3",
+      "id": 114,
+      "at": 1800000115000,
+      "rng": 2494102556
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 115,
+      "at": 1800000116000,
+      "rng": 3482888110
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-4",
+      "id": 117,
+      "at": 1800000118000,
+      "rng": 1593593538
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 118,
+      "at": 1800000119000,
+      "rng": 1200766777
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 120,
+      "at": 1800000121000,
+      "rng": 248287613
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 121,
+      "at": 1800000122000,
+      "rng": 3019842744
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-6",
+      "id": 122,
+      "at": 1800000123000,
+      "rng": 3442771457
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 125,
+      "at": 1800000126000,
+      "rng": 2922716000
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 126,
+      "at": 1800000127000,
+      "rng": 3932788543
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-8",
+      "id": 128,
+      "at": 1800000129000,
+      "rng": 1812518627
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 130,
+      "at": 1800000131000,
+      "rng": 1647107783
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 131,
+      "at": 1800000132000,
+      "rng": 3672673658
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 133,
+      "at": 1800000134000,
+      "rng": 2835647310
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 137,
+      "at": 1800000138000,
+      "rng": 1863766003
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 138,
+      "at": 1800000139000,
+      "rng": 1177375926
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-32"
+      ],
+      "actor": "player-4",
+      "id": 139,
+      "at": 1800000140000,
+      "rng": 23355607
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 141,
+      "at": 1800000142000,
+      "rng": 1557474811
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 143,
+      "at": 1800000144000,
+      "rng": 718855007
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-6",
+      "id": 144,
+      "at": 1800000145000,
+      "rng": 1025569074
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-6",
+      "id": 145,
+      "at": 1800000146000,
+      "rng": 2762427651
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 148,
+      "at": 1800000149000,
+      "rng": 3498400689
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 149,
+      "at": 1800000150000,
+      "rng": 3926270300
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-8",
+      "id": 150,
+      "at": 1800000151000,
+      "rng": 2884106613
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 153,
+      "at": 1800000154000,
+      "rng": 4285222419
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 154,
+      "at": 1800000155000,
+      "rng": 2513992790
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 156,
+      "at": 1800000157000,
+      "rng": 2909755882
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 159,
+      "at": 1800000160000,
+      "rng": 336387845
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 160,
+      "at": 1800000161000,
+      "rng": 695157920
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-4",
+      "id": 161,
+      "at": 1800000162000,
+      "rng": 970860553
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 162,
+      "at": 1800000163000,
+      "rng": 3797144355
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-25"
+      ],
+      "actor": "player-5",
+      "id": 163,
+      "at": 1800000164000,
+      "rng": 4107352136
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-6",
+      "id": 168,
+      "at": 1800000169000,
+      "rng": 1171367842
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 171,
+      "at": 1800000172000,
+      "rng": 2196036317
+    },
+    {
+      "name": "assignWorker",
+      "args": [
+        "prop-39",
+        "#ffe5b4"
+      ],
+      "actor": "player-8",
+      "id": 172,
+      "at": 1800000173000,
+      "rng": 1893146264
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 174,
+      "at": 1800000175000,
+      "rng": 2274080097
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-8",
+      "id": 175,
+      "at": 1800000176000,
+      "rng": 2778633765
+    },
+    {
+      "name": "buildHouse",
+      "args": [
+        "prop-37"
+      ],
+      "actor": "player-8",
+      "id": 177,
+      "at": 1800000178000,
+      "rng": 3619995945
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-8",
+      "id": 178,
+      "at": 1800000179000,
+      "rng": 1935939700
+    },
+    {
+      "name": "resolveCard",
+      "args": [],
+      "actor": "player-8",
+      "id": 179,
+      "at": 1800000180000,
+      "rng": 689420909
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 182,
+      "at": 1800000183000,
+      "rng": 1192751435
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-2",
+      "id": 183,
+      "at": 1800000184000,
+      "rng": 4078769710
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 185,
+      "at": 1800000186000,
+      "rng": 3073664322
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 190,
+      "at": 1800000191000,
+      "rng": 3943465271
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-4",
+      "id": 191,
+      "at": 1800000192000,
+      "rng": 3320605994
+    },
+    {
+      "name": "purchaseProperty",
+      "args": [
+        "prop-1"
+      ],
+      "actor": "player-4",
+      "id": 192,
+      "at": 1800000193000,
+      "rng": 792595966
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 193,
+      "at": 1800000194000,
+      "rng": 2782834144
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-5",
+      "id": 195,
+      "at": 1800000196000,
+      "rng": 2615078676
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-6",
+      "id": 200,
+      "at": 1800000201000,
+      "rng": 4115280188
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-7",
+      "id": 203,
+      "at": 1800000204000,
+      "rng": 4063930319
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-8",
+      "id": 206,
+      "at": 1800000207000,
+      "rng": 3938112310
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-1",
+      "id": 208,
+      "at": 1800000209000,
+      "rng": 1283739553
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-2",
+      "id": 216,
+      "at": 1800000217000,
+      "rng": 3109301212
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-3",
+      "id": 220,
+      "at": 1800000221000,
+      "rng": 1797239791
+    },
+    {
+      "name": "endTurn",
+      "args": [],
+      "actor": "player-4",
+      "id": 222,
+      "at": 1800000223000,
+      "rng": 872495830
+    },
+    {
+      "name": "handleDiceRoll",
+      "args": [],
+      "actor": "player-5",
+      "id": 223,
+      "at": 1800000224000,
+      "rng": 483800125
+    },
+    {
+      "name": "payRent",
+      "args": [],
+      "actor": "player-5",
+      "id": 224,
+      "at": 1800000225000,
+      "rng": 2431172714
+    }
+  ],
+  "failure": "current player is not active\n\n0 !== 1\n"
+}

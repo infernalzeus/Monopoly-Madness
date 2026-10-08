@@ -205,7 +205,8 @@ export const getInitialState = (): GameState => ({
     tradeOffers: [],
     pendingRent: null,
     pendingCard: null,
-    workers: []
+    workers: [],
+    freeParkingPot: 0
   });
 
 export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
@@ -580,11 +581,12 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
 
   // Automatic turn advancement when status is 'completed'
   useEffect(() => {
-    if (gameState.turnState === 'completed' && gameState.gamePhase === 'playing' && !gameState.currentAuction && gameState.currentPlayer === localPlayerId) {
+    const currentIsOut = !gameState.players.find(p => p.id === gameState.currentPlayer)?.isActive;
+    if (gameState.turnState === 'completed' && gameState.gamePhase === 'playing' && !gameState.currentAuction && (gameState.currentPlayer === localPlayerId || (currentIsOut && !!localPlayerId))) {
       const turnAtStart = gameState.turn;
       const timer = setTimeout(() => {
         advanceTurnRef.current(turnAtStart);
-      }, 2000);
+      }, currentIsOut && gameState.currentPlayer !== localPlayerId ? 3500 : 2000);
       return () => clearTimeout(timer);
     }
   // Deliberately omit advanceTurn — use ref to prevent Firestore updates from resetting the timer
@@ -1162,7 +1164,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
       if (fine <= 0 || actor.balance < fine) return prev;
       const next = {
         ...prev,
-        freeParkingPot: prev.settings.freeParkingPot ? (prev.freeParkingPot || 0) + fine : prev.freeParkingPot,
+        ...(prev.settings.freeParkingPot ? { freeParkingPot: (prev.freeParkingPot || 0) + fine } : {}),
         players: prev.players.map(p => p.id === actor.id ? { ...p, balance: p.balance - fine, isInJail: false, jailTurns: 0 } : p)
       };
       return addEvent(next, 'jail', actor.name, `paid $${fine.toLocaleString('en-US')} jail fine (20% of $${income.toLocaleString('en-US')} property income)`, -fine);

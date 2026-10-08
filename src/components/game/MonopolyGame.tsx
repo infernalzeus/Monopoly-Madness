@@ -15,10 +15,13 @@ import { db, authReady, currentUid } from '@/lib/firebase';
 import { setClockOffset } from '@/lib/clock';
 import { readableTextOn } from '@/lib/utils';
 import '@/ui-kit/tokens.css';
+import '@/ui-kit/cards/tokens.css';
+import { DoublesBanner } from '@/ui-kit/cards';
+import type { CardCtx } from './cardAdapters';
 import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
 import StageHost from './StageHost';
 import TradeHost from './TradeHost';
-import { WorkersHost, TeamsHost, PortfolioHost, TileSummaryStrip } from './SheetsHost';
+import { WorkersHost, TeamsHost, PortfolioHost, PortfolioCards, TileSummaryStrip } from './SheetsHost';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -70,6 +73,7 @@ const MonopolyGame: React.FC = () => {
   const [winnerDismissed, setWinnerDismissed] = useState(false);
   const [roomCopied, setRoomCopied] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
+  const [doublesBanner, setDoublesBanner] = useState<'double' | 'triple' | null>(null);
   const [isTeamsOpen, setIsTeamsOpen] = useState(false);
   const [summaryProperty, setSummaryProperty] = useState<Property | null>(null);
   useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
@@ -262,6 +266,17 @@ const MonopolyGame: React.FC = () => {
     gameState.currentAuction?.highestBidder,
     gameState.gamePhase
   ]);
+
+  // "Doubles — roll again" / "three doubles" banner for 1.5 s after a double roll (non-blocking)
+  const rollKey = gameState.lastDiceRoll ? `${gameState.turn}-${gameState.lastDiceRoll.dice1}-${gameState.lastDiceRoll.dice2}` : '';
+  useEffect(() => {
+    if (!rollKey || !gameState.lastDiceRoll?.isDouble) return;
+    const roller = gameState.players.find(p => p.id === gameState.currentPlayer);
+    setDoublesBanner(roller?.isInJail ? 'triple' : 'double');
+    const t = setTimeout(() => setDoublesBanner(null), 1600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rollKey]);
 
   // Escape closes the property / special-tile overlays
   useEffect(() => {
@@ -601,6 +616,10 @@ const MonopolyGame: React.FC = () => {
   }
 
   const myOwnedProperties = gameState.properties.filter(p => p.owner === myPlayer.name);
+  const cardCtx: CardCtx = {
+    state: gameState, me: myPlayer, isMyTurn,
+    actions: { buildHouse, buildHotel, sellHouse, sellHotel, mortgage: mortgageProperty, unmortgage: unmortgageProperty }
+  };
   const ownedProperties = gameState.properties.filter(p => p.owner === currentPlayer.name);
 
   const handlePropertyClick = (property: Property) => {
@@ -738,7 +757,7 @@ const MonopolyGame: React.FC = () => {
           id: joinedPlayerId,
           name: playerName || `Player ${state.players.length + 1}`,
           balance: lateJoin ? 0 : (state.settings.startingBalance || 1500000),
-          isSpectator: lateJoin || undefined,
+          ...(lateJoin ? { isSpectator: true } : {}),
           properties: [],
           position: 0,
           color: color || colors[state.players.length] || '#000',
@@ -1010,6 +1029,23 @@ const MonopolyGame: React.FC = () => {
         />
       </div>
 
+      {doublesBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[180] pointer-events-none">
+          <DoublesBanner triple={doublesBanner === 'triple'} visible />
+        </div>
+      )}
+      {(() => {
+        // Host escape hatch: with the turn timer off, a player who left would freeze the table
+        const seen = playerPresence[currentPlayer.id];
+        const away = !currentPlayer.isBot && !isMyTurn && gameState.gamePhase === 'playing' && !gameState.currentAuction && (!seen || Date.now() - seen > 45000);
+        return away && isLobbyOwner ? (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/50 bg-amber-950/40 p-3 text-sm text-amber-100">
+            <span>{currentPlayer.name} looks disconnected.</span>
+            <button onClick={endTurn} className="min-h-[44px] px-4 rounded-lg bg-amber-500 text-slate-950 font-bold">Skip their turn</button>
+          </div>
+        ) : null;
+      })()}
+
       {/* Main Game Layout */}
       <div className="flex flex-col gap-6">
         {/* Top/Main Area - Game Board and Dice */}
@@ -1056,6 +1092,7 @@ const MonopolyGame: React.FC = () => {
               landedOnOwn={landedOnOwnProperty ? (propertyOnMyTile ?? null) : null}
               auctionTimer={auctionTimer}
               actions={{ payJailFine, spendJailCard, skipJailTurn, resolveCard, payRent, purchaseProperty, skipPurchase, placeBid, endAuctionNow, buildHouse, buildHotel, endTurn, canBuildHouse }}
+              cardCtx={cardCtx}
               fallback={ownedPropertyOnTile ? (
                 <div className="absolute inset-0 z-50 flex p-1 sm:p-4 bg-slate-950/90 rounded-sm overflow-y-auto overflow-x-hidden max-sm:fixed max-sm:z-[120] max-sm:p-0 max-sm:items-end" role="dialog" aria-modal="true" aria-label="Make an offer">
                   <div className="w-full max-w-sm h-fit m-auto max-sm:m-0 max-sm:max-w-none max-sm:max-h-[88vh] max-sm:overflow-y-auto max-sm:rounded-t-2xl">
@@ -1147,6 +1184,9 @@ const MonopolyGame: React.FC = () => {
                 onMortgage={mortgageProperty}
                 onUnmortgage={unmortgageProperty}
               />
+              </div>
+              <div className="hidden lg:block rounded-xl bg-slate-900/80 border border-slate-700 p-3">
+                <PortfolioCards ctx={cardCtx} spendJailCard={spendJailCard} />
               </div>
 
               {/* Team Panel - Only visible if teams enabled */}
@@ -1307,8 +1347,7 @@ const MonopolyGame: React.FC = () => {
       {/* Portfolio sheet (phones) */}
       {isPortfolioOpen && (
         <SheetDock>
-          <PortfolioHost gameState={gameState} me={myPlayer} isMyTurn={isMyTurn} onClose={() => setIsPortfolioOpen(false)}
-            mortgageProperty={mortgageProperty} unmortgageProperty={unmortgageProperty} />
+          <PortfolioHost ctx={cardCtx} onClose={() => setIsPortfolioOpen(false)} spendJailCard={spendJailCard} />
         </SheetDock>
       )}
 

@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.12`**  
+> **Current Version: `v1.1.13`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,14 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.13 — property & event cards wired + playtest fixes
+
+**Cards** (`src/ui-kit/cards/`, adapter `cardAdapters.ts`): portfolio = `CardRail` (phone sheet + desktop right column) with tap-to-inspect title-deed (`InspectView`, portalled to `body`; rent table, flavour, build/sell/mortgage actions with visible reasons); purchase / own-property / auction stages show the property `PropertyFace`; Chance & Community Chest use the flip-to-reveal `RevealCard` (money, rule lines, jail-card perk); `DoublesBanner` for 1.5 s after a double; held Get-Out-of-Jail cards via `JailCard`. Unwired: `TradeCardPicker` (TradeSheet keeps its list), `CardGrid`.
+
+**Fixes from Codex's emulator playtest (`playtest/REPORT.md`):** PT01 *new guests could never join* (explicit `undefined` `isSpectator` rejected by Firestore) · PT02 bot/human bail write failed (`freeParkingPot: undefined`) · PT03 rematch failed (same cause) → all three fixed at the source **and** Firestore now initialised with `ignoreUndefinedProperties` · PT04 bankrupt current player: any client advances the turn after 3.5 s · PT05 timer-off disconnect: host gets a "Skip their turn" button when the current player's presence is stale. `src/lib/firebase.ts` also gained Codex's default-off emulator switch (demo- project guard).
 
 ---
 

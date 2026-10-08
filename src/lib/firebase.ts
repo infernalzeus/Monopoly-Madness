@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged, type Auth, type User } from 'firebase/auth';
+import { initializeFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator, signInAnonymously, onAuthStateChanged, type Auth, type User } from 'firebase/auth';
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -13,14 +13,24 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+// Explicit opt-in for isolated local playtests. A demo id cannot address a production project.
+const useEmulator = import.meta.env.VITE_USE_EMULATOR === 'true';
+if (useEmulator && !firebaseConfig.projectId?.startsWith('demo-')) {
+  throw new Error('Emulator mode requires a demo- Firebase project ID.');
+}
+
 // A deployment without the VITE_FIREBASE_* variables used to crash at import time and render a blank page
 // (auth/invalid-api-key). Now the app still loads and shows a clear "not configured" screen (see main.tsx).
 export const firebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
 const app = firebaseConfigured ? initializeApp(firebaseConfig) : null;
 
-export const db = (app ? getFirestore(app) : null) as unknown as Firestore;
+export const db = (app ? initializeFirestore(app, { ignoreUndefinedProperties: true }) : null) as unknown as Firestore;
 export const auth = (app ? getAuth(app) : null) as unknown as Auth;
-export const analytics = app && typeof window !== 'undefined' ? getAnalytics(app) : null;
+if (app && useEmulator) {
+  connectFirestoreEmulator(db, '127.0.0.1', 8180);
+  connectAuthEmulator(auth, 'http://127.0.0.1:9199', { disableWarnings: true });
+}
+export const analytics = app && !useEmulator && typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Anonymous sign-in gives every browser a stable uid (persisted by Firebase) which seats are bound to,
 // and lets firestore.rules require `request.auth != null`. If the Anonymous provider is not enabled in the

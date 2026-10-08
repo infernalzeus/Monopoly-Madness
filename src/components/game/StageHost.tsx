@@ -5,6 +5,8 @@ import {
   CurrencyAmount, DialogActions, Fact, KitButton, formatCurrency
 } from '@/ui-kit';
 import { mortgagePayout } from '@/gameEngine/core';
+import { PropertyFace, RevealCard, JailCard } from '@/ui-kit/cards';
+import { cardProps, type CardCtx } from './cardAdapters';
 import type { GameState, PendingCard, Player, Property } from '@/types/game';
 
 export interface StageHostActions {
@@ -35,6 +37,7 @@ interface StageHostProps {
   landedOnOwn: Property | null;
   auctionTimer: number | null;
   actions: StageHostActions;
+  cardCtx: CardCtx;
   /** Shown when none of the kit situations applies (e.g. the "make an offer on an owned tile" panel). */
   fallback?: ReactNode;
 }
@@ -45,7 +48,7 @@ interface StageHostProps {
  * game-hook action, which still validates the actor inside its transaction.
  */
 const StageHost: React.FC<StageHostProps> = ({
-  gameState, me, isMyTurn, showJail, jailFine, pendingCard, onCardResolving, rent, landedOnOwn, auctionTimer, actions, fallback
+  gameState, me, isMyTurn, showJail, jailFine, pendingCard, onCardResolving, rent, landedOnOwn, auctionTimer, actions, cardCtx, fallback
 }) => {
   const [jailMethod, setJailMethod] = useState<'pay' | 'card'>('pay');
   const auction = gameState.currentAuction;
@@ -64,17 +67,28 @@ const StageHost: React.FC<StageHostProps> = ({
     stage = (
       <ActionStage kind="jail" title="You're in jail" footer={<JailDialogActions {...props} />}>
         <JailDialogBody {...props} />
+        {cards > 0 && <JailCard count={cards} />}
       </ActionStage>
     );
   } else if (pendingCard) {
-    const props = {
-      type: pendingCard.type, amount: pendingCard.amount, isReward: pendingCard.isReward, diceRoll: pendingCard.diceRoll,
-      income: pendingCard.income, numProperties: pendingCard.numProperties, jailCard: pendingCard.jailCard,
-      onResolve: () => { onCardResolving(); actions.resolveCard(); }, actionsInBody: false
-    };
+    const amount = pendingCard.amount;
+    const signed = pendingCard.isReward ? amount : -amount;
+    const label = pendingCard.type === 'chance' ? 'Chance' : 'Community Chest';
     stage = (
-      <ActionStage kind="card" title={pendingCard.type === 'chance' ? 'Chance' : 'Community Chest'} footer={<CardDialogActions {...props} />}>
-        <CardDialogBody {...props} />
+      <ActionStage kind="card" title={label} footer={<p className="mma-muted">Tap the card to reveal it, then collect or pay.</p>}>
+        <RevealCard
+          key={`${gameState.turn}-${pendingCard.type}-${pendingCard.diceRoll}`}
+          kind={pendingCard.type} title={amount === 0 ? 'Nothing happens' : pendingCard.isReward ? 'Lucky draw' : 'Unlucky draw'}
+          amount={amount === 0 ? undefined : signed}
+          lines={[
+            `Roll ${pendingCard.diceRoll} · ${pendingCard.diceRoll % 2 !== 0 ? 'odd → reward' : 'even → penalty'}`,
+            `Rental income ${formatCurrency(pendingCard.income)} across ${pendingCard.numProperties} propert${pendingCard.numProperties === 1 ? 'y' : 'ies'}`,
+            amount === 0 ? 'No income-producing properties — no change.' : `10% of income = ${formatCurrency(amount)}`
+          ]}
+          perk={pendingCard.jailCard ? 'Doubles! You earn a Get Out of Jail Free card.' : undefined}
+          onContinue={() => { onCardResolving(); actions.resolveCard(); }}
+          continueLabel={amount === 0 ? 'Continue' : pendingCard.isReward ? `Collect ${formatCurrency(amount)}` : `Pay ${formatCurrency(amount)}`}
+        />
       </ActionStage>
     );
   } else if (rent) {
@@ -102,6 +116,7 @@ const StageHost: React.FC<StageHostProps> = ({
           />
         }
       >
+        <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, p, 'hand')} /></div>
         {p.type === 'property' ? (
           <>
             <Fact label="Buildings">{p.hasHotel ? 'Hotel' : `${p.houses} / 4 houses`}</Fact>
@@ -128,6 +143,7 @@ const StageHost: React.FC<StageHostProps> = ({
           ) : <p className="mma-muted">A late bid extends the clock to at least 15 seconds.</p>
         }
       >
+        {property && <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>}
         <AuctionStatus
           propertyName={property?.name ?? 'Property'} currentBid={auction.currentBid} highestBidder={auction.highestBidder}
           you={me.name} secondsLeft={secondsLeft} totalSeconds={Math.max(auction.duration, secondsLeft)}
@@ -149,6 +165,7 @@ const StageHost: React.FC<StageHostProps> = ({
       };
       stage = (
         <ActionStage kind="purchase" title="Property for sale" footer={<PurchaseDialogActions {...props} />}>
+          <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>
           <PurchaseDialogBody {...props} />
         </ActionStage>
       );
