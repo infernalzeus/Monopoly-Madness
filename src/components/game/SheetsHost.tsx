@@ -5,7 +5,7 @@ import {
 } from '@/ui-kit';
 import { computeRent } from '@/gameEngine/core';
 import { PropertyCard, JailCard } from '@/ui-kit/cards';
-import { SheetShell, Fact, CurrencyAmount, PlayerIdentity } from '@/ui-kit';
+import { SheetShell, Fact, CurrencyAmount, PlayerIdentity, KitButton } from '@/ui-kit';
 import { PlayersList } from './SideDock';
 import { cardProps, identityOf, type CardCtx } from './cardAdapters';
 import type { GameState, Player, Property } from '@/types/game';
@@ -63,6 +63,8 @@ interface TeamsHostProps {
   joinTeam: (teamId: string) => void; createTeam: (name: string) => void;
 }
 export const TeamsHost: React.FC<TeamsHostProps> = ({ gameState, me, onClose, joinTeam, createTeam }) => {
+  const [creating, setCreating] = useState(false);
+  const [teamName, setTeamName] = useState('');
   const locked = gameState.turn >= gameState.players.length;
   const teams: TeamSummary[] = gameState.teams.map(t => {
     const members = gameState.players.filter(p => t.members.includes(p.id));
@@ -74,14 +76,22 @@ export const TeamsHost: React.FC<TeamsHostProps> = ({ gameState, me, onClose, jo
       disabledReason: locked ? 'Alliances are locked after the first round.' : full ? 'This team is full (4 players).' : undefined
     };
   });
+  if (creating) {
+    const submit = () => { const n = teamName.trim().slice(0, 24); if (n) { createTeam(n); setCreating(false); setTeamName(''); } };
+    return (
+      <SheetShell title="Name your team" open onClose={() => setCreating(false)}
+        footer={<div className="mma-actions"><KitButton variant="primary" onClick={submit} disabled={!teamName.trim()}>Create team</KitButton><KitButton onClick={() => setCreating(false)}>Cancel</KitButton></div>}>
+        <label className="mma-label" htmlFor="team-name-input">Team name (max 24 characters)</label>
+        <input id="team-name-input" className="mma-input" autoFocus maxLength={24} value={teamName} placeholder="e.g. Red Dragons"
+          onChange={e => setTeamName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit(); }} />
+      </SheetShell>
+    );
+  }
   return (
     <TeamsSheet
       teams={teams} yourTeamId={me.teamId} open onClose={onClose}
       onJoin={joinTeam}
-      onCreate={locked ? undefined : () => {
-        const name = window.prompt('Name your team (max 24 characters):', 'Team');
-        if (name && name.trim()) createTeam(name.trim());
-      }}
+      onCreate={locked ? undefined : () => setCreating(true)}
     />
   );
 };

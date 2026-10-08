@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { TradeSheet, type TradeDraft, type TradePropertyChoice, type TradePreviewOffer } from '@/ui-kit';
+import { TradeCardPicker } from '@/ui-kit/cards';
+import { cardProps, type CardCtx } from './cardAdapters';
 import { hasBuildingsInGroup } from '@/gameEngine/core';
 import { serverNow } from '@/lib/clock';
 import type { GameState, Player } from '@/types/game';
@@ -7,6 +9,7 @@ import type { GameState, Player } from '@/types/game';
 interface TradeHostProps {
   gameState: GameState;
   me: Player;
+  cardCtx: CardCtx;
   onClose: () => void;
   createTradeOffer: (toPlayer: string, offered: string[], requested: string[], offeredCash: number, requestedCash: number) => void;
   acceptTradeOffer: (offerId: string, acceptorName?: string) => void;
@@ -17,7 +20,7 @@ interface TradeHostProps {
 const EMPTY: TradeDraft = { toPlayer: '', offeredProperties: [], requestedProperties: [], offeredCash: '', requestedCash: '' };
 
 /** Adapter between GameState and the presentation-only TradeSheet. All rules stay in the game hook. */
-const TradeHost: React.FC<TradeHostProps> = ({ gameState, me, onClose, createTradeOffer, acceptTradeOffer, rejectTradeOffer, cancelTradeOffer }) => {
+const TradeHost: React.FC<TradeHostProps> = ({ gameState, me, cardCtx, onClose, createTradeOffer, acceptTradeOffer, rejectTradeOffer, cancelTradeOffer }) => {
   const [draft, setDraft] = useState<TradeDraft>(EMPTY);
   const props = gameState.properties;
 
@@ -59,6 +62,19 @@ const TradeHost: React.FC<TradeHostProps> = ({ gameState, me, onClose, createTra
       }}
       onAccept={id => acceptTradeOffer(id, me.name)} onReject={rejectTradeOffer} onCancel={cancelTradeOffer}
       submitDisabledReason={submitDisabledReason} open onClose={onClose}
+      pickerFor={side => {
+        const list = side === 'offeredProperties' ? choicesFor(me.name) : (draft.toPlayer ? choicesFor(draft.toPlayer) : []);
+        const label = side === 'offeredProperties' ? 'Properties you give' : 'Properties you want';
+        if (side === 'requestedProperties' && !draft.toPlayer) return <p className="mma-muted">Choose who to trade with first.</p>;
+        if (list.length === 0) return <p className="mma-muted">No properties to pick.</p>;
+        return (
+          <TradeCardPicker
+            label={label} selectedIds={draft[side]}
+            choices={list.map(c => ({ card: cardProps(cardCtx, props.find(p => p.id === c.id)!, 'mini'), lockedReason: c.lockedReason }))}
+            onToggle={id => setDraft({ ...draft, [side]: draft[side].includes(id) ? draft[side].filter(v => v !== id) : [...draft[side], id] })}
+          />
+        );
+      }}
     />
   );
 };

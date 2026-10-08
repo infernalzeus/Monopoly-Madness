@@ -1191,7 +1191,7 @@ const MonopolyGame: React.FC = () => {
       {isTradingOpen && (
         <SheetDock>
           <TradeHost
-            gameState={gameState} me={myPlayer} onClose={() => setIsTradingOpen(false)}
+            gameState={gameState} me={myPlayer} cardCtx={cardCtx} onClose={() => setIsTradingOpen(false)}
             createTradeOffer={createTradeOffer} acceptTradeOffer={acceptTradeOffer}
             rejectTradeOffer={rejectTradeOffer} cancelTradeOffer={cancelTradeOffer}
           />

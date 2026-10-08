@@ -116,7 +116,13 @@ const StageHost: React.FC<StageHostProps> = ({
           />
         }
       >
-        <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, p, 'hand')} /></div>
+        <div className="flex flex-col items-center gap-2">
+          <div className="sm:[zoom:1.2]"><PropertyFace {...cardProps(cardCtx, p, 'hand')} /></div>
+          <details className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-[32px] flex items-center">Full title deed &amp; rent table</summary>
+            <div className="mt-2 flex justify-center"><PropertyFace {...cardProps(cardCtx, p, 'full')} /></div>
+          </details>
+        </div>
         {p.type === 'property' ? (
           <>
             <Fact label="Buildings">{p.hasHotel ? 'Hotel' : `${p.houses} / 4 houses`}</Fact>
@@ -143,7 +149,13 @@ const StageHost: React.FC<StageHostProps> = ({
           ) : <p className="mma-muted">A late bid extends the clock to at least 15 seconds.</p>
         }
       >
-        {property && <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>}
+        {property && <div className="flex flex-col items-center gap-2">
+          <div className="sm:[zoom:1.2]"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>
+          <details className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-[32px] flex items-center">Full title deed &amp; rent table</summary>
+            <div className="mt-2 flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'full')} /></div>
+          </details>
+        </div>}
         <AuctionStatus
           propertyName={property?.name ?? 'Property'} currentBid={auction.currentBid} highestBidder={auction.highestBidder}
           you={me.name} secondsLeft={secondsLeft} totalSeconds={Math.max(auction.duration, secondsLeft)}
@@ -165,7 +177,13 @@ const StageHost: React.FC<StageHostProps> = ({
       };
       stage = (
         <ActionStage kind="purchase" title="Property for sale" footer={<PurchaseDialogActions {...props} />}>
-          <div className="flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>
+          <div className="flex flex-col items-center gap-2">
+          <div className="sm:[zoom:1.2]"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>
+          <details className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-[32px] flex items-center">Full title deed &amp; rent table</summary>
+            <div className="mt-2 flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'full')} /></div>
+          </details>
+        </div>
           <PurchaseDialogBody {...props} />
         </ActionStage>
       );

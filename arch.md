@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.15`**  
+> **Current Version: `v1.1.16`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,12 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.16 — trade card picker, bigger pop-up cards, team-name form
+
+`TradeSheet` gained an optional `pickerFor` slot; `TradeHost` fills it with the kit's `TradeCardPicker` (mini cards, tick on selected, padlock + reason for built colour groups / auctions). Buy / auction / own-property pop-ups show the card at 1.2× on desktop with a collapsible "Full title deed & rent table". `TeamsHost` has an inline "Name your team" form (no browser prompt). `ARCHITECTURE.canvas` updated. Prompt for the visual polish pass (everything except the lobby): `UI_POLISH_PROMPT.md`.
 
 ---
 
