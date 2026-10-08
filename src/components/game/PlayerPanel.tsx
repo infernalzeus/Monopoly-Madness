@@ -181,6 +181,8 @@ interface PlayerPanelProps {
   workersEnabled?: boolean;
   /** When provided, the property cards render here instead of the legacy mini tiles */
   cardsSlot?: React.ReactNode;
+  /** Rank by real net worth, computed once by the caller so every panel agrees */
+  rank?: number;
 }
 
 const PlayerPanel: React.FC<PlayerPanelProps> = ({
@@ -192,6 +194,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   onUnmortgage,
   workersEnabled = false,
   cardsSlot,
+  rank: rankProp,
 }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [colorOrder, setColorOrder] = useState<string[]>(DEFAULT_COLOR_ORDER);
@@ -199,7 +202,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   const dragOver = useRef<string | null>(null);
 
   const netWorth = currentPlayer.balance + ownedProperties.reduce((sum, p) => sum + p.currentValue, 0);
-  const rank = allPlayers
+  const rank = rankProp ?? allPlayers
     .filter(p => p.isActive)
     .sort((a, b) => (b.balance + b.properties.length * 100000) - (a.balance + a.properties.length * 100000))
     .findIndex(p => p.id === currentPlayer.id) + 1;

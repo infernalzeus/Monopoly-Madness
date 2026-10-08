@@ -21,7 +21,7 @@ import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
 import StageHost from './StageHost';
 import TradeHost from './TradeHost';
 import { WorkersHost, TeamsHost, PortfolioHost, PortfolioCards, PlayersSheet, TileSummaryStrip } from './SheetsHost';
-import { PlayersList, InlineLog, BottomNav } from './SideDock';
+import { PlayersList, InlineLog, BottomNav, netWorthOf } from './SideDock';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -1149,6 +1149,7 @@ const MonopolyGame: React.FC = () => {
                 onMortgage={mortgageProperty}
                 onUnmortgage={unmortgageProperty}
                 cardsSlot={<PortfolioCards ctx={cardCtx} spendJailCard={spendJailCard} />}
+                rank={1 + gameState.players.filter(p => p.isActive && !p.isSpectator && netWorthOf(gameState, p) > netWorthOf(gameState, myPlayer)).length}
               />
             )}
             {sideTab === 'players' && <PlayersList state={gameState} me={myPlayer} />}
