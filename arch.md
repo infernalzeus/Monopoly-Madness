@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.14`**  
+> **Current Version: `v1.1.15`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -577,6 +577,12 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 
 ---
 
+## 🔧 v1.1.15 — board tile → title deed, Workers button, canvas moved
+
+Board tile tap now opens the same title deed as the portfolio (`InspectView` via `cardProps`; the old plain `PropertyCard.tsx` is deleted). **Workers** has a phone bottom-nav button and a desktop tab-bar button when Workers mode is on. **`ARCHITECTURE.canvas`** now lives in this repo (root, next to this file) and is current as of v1.1.15 — **update it in the same commit as any structural change** (new module, new phase, changed data flow, new rule decision); it was previously in the LLM wiki and had drifted to v1.1.5.
+
+---
+
 ## 🔧 v1.1.14 — one-screen layout (no page scrolling)
 
 `MonopolyGame` is now a `h-[100dvh]` flex column. **Desktop:** header → [board column with the turn strip above it | side dock]. The side dock (`flex-1`, 380–680 px) has tabs **Properties** (the existing `PlayerPanel` — cash, net worth — with the property **cards rendered inside its Properties section** via `cardsSlot`), **Players** (`PlayersList`), **Log** (`InlineLog`) and **Teams**, plus a Trade button with a badge for offers addressed to you. The separate card panel, mode pills, the Players Overview table, the floating Game Log button and the old bottom section are gone. **Phone:** header → turn strip → board → money strip → fixed **bottom nav** (Properties / Players / Log, plus Trade and Teams when enabled) opening bottom sheets; tapping a tile shows a summary floating above the nav. Cards are `mini` (3 per row) when you own more than 4, `hand` otherwise, one flowing list ordered by colour group. New files: `SideDock.tsx`, `PlayersSheet` in `SheetsHost.tsx`.
@@ -781,6 +787,8 @@ When a player lands on a property owned by another player, a **Purchase Offer** 
 ## 🚦 Developer Checklist for Modifications
 
 Before committing any modifications, run through this quick checklist:
+
+* [ ] **`ARCHITECTURE.canvas` updated** if the change touches structure, data flow, phases or rule decisions (and its title shows the current version).
 
 * [ ] **Strict Typing**: No using of `any` types for new state elements. Verify all shapes are described in `src/types/game.ts`.
 * [ ] **Side-Effect-Free Engine**: Is `core.ts` completely free of window, canvas, animation, or browser-specific state calls? (All timers and animations belong exclusively in components or React effects).

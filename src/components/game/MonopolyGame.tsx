@@ -4,7 +4,6 @@ import MonopolyBoardLayout from './MonopolyBoardLayout';
 import CentralDisplay from './CentralDisplay';
 import AuctionPanel from './AuctionPanel';
 import PlayerPanel from './PlayerPanel';
-import PropertyCard from './PropertyCard';
 import SpecialPropertyInfo from './SpecialPropertyInfo';
 import RulesPanel from './RulesPanel';
 import GameConsole from './GameConsole';
@@ -16,8 +15,8 @@ import { setClockOffset } from '@/lib/clock';
 import { readableTextOn } from '@/lib/utils';
 import '@/ui-kit/tokens.css';
 import '@/ui-kit/cards/tokens.css';
-import { DoublesBanner } from '@/ui-kit/cards';
-import type { CardCtx } from './cardAdapters';
+import { DoublesBanner, InspectView } from '@/ui-kit/cards';
+import { cardProps, type CardCtx } from './cardAdapters';
 import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
 import StageHost from './StageHost';
 import TradeHost from './TradeHost';
@@ -945,31 +944,11 @@ const MonopolyGame: React.FC = () => {
         onDismiss={handleDismissEvent}
       />
 
-      {/* Property Details Overlay - Center Screen */}
-      {selectedProperty && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-          role="dialog" aria-modal="true" aria-label="Property details"
-          onClick={() => setSelectedProperty(null)}
-        >
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm transform transition-all animate-in zoom-in-95 duration-200">
-            <PropertyCard
-              property={selectedProperty}
-              isOwned={selectedProperty.isOwned}
-              canBuyHouse={isMyTurn && selectedProperty.owner === myPlayer.name}
-              canBuyHotel={isMyTurn && selectedProperty.owner === myPlayer.name}
-              onBuyHouse={() => buildHouse(selectedProperty.id)}
-              onBuyHotel={() => buildHotel(selectedProperty.id)}
-              onSellHouse={() => sellHouse(selectedProperty.id)}
-              onSellHotel={() => sellHotel(selectedProperty.id)}
-              onMortgage={() => mortgageProperty(selectedProperty.id)}
-              onUnmortgage={() => unmortgageProperty(selectedProperty.id)}
-              allProperties={gameState.properties}
-            />
-            <p className="text-center text-slate-400 text-xs mt-4 animate-pulse">Click anywhere to close</p>
-          </div>
-        </div>
-      )}
+      {/* Property title deed: same card + actions as the portfolio (board tile tap, phone summary → Details) */}
+      {selectedProperty && (() => {
+        const live = gameState.properties.find(p => p.id === selectedProperty.id) ?? selectedProperty;
+        return <InspectView {...cardProps(cardCtx, live, 'full')} origin={null} onClose={() => setSelectedProperty(null)} />;
+      })()}
 
       {/* Dialogs & Overlays removed from global space to board space */}
       
@@ -1150,6 +1129,9 @@ const MonopolyGame: React.FC = () => {
               <button key={id} role="tab" aria-selected={sideTab === id} onClick={() => setSideTab(id)}
                 className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${sideTab === id ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>{label}</button>
             ))}
+            {gameState.settings.workersEnabled && (
+              <button onClick={() => setIsWorkerPanelOpen(o => !o)} className="min-h-[40px] px-3 rounded-lg text-sm font-semibold bg-amber-700 hover:bg-amber-600 text-white">Workers</button>
+            )}
             {gameState.settings.tradingEnabled && (
               <button onClick={() => setIsTradingOpen(true)} className="relative min-h-[40px] px-3 rounded-lg text-sm font-semibold bg-purple-700 hover:bg-purple-600 text-white">
                 Trade{gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length > 0 && <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 text-xs">{gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length}</span>}
@@ -1201,7 +1183,8 @@ const MonopolyGame: React.FC = () => {
         { id: 'players', label: 'Players', active: isPlayersOpen, onClick: () => setIsPlayersOpen(o => !o) },
         { id: 'log', label: 'Log', active: isLogOpen, onClick: () => setIsLogOpen(o => !o) },
         ...(gameState.settings.tradingEnabled ? [{ id: 'trade' as const, label: 'Trade', badge: gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length, active: isTradingOpen, onClick: () => setIsTradingOpen(o => !o) }] : []),
-        ...(gameState.settings.teamsEnabled ? [{ id: 'teams' as const, label: 'Teams', active: isTeamsOpen, onClick: () => setIsTeamsOpen(o => !o) }] : [])
+        ...(gameState.settings.teamsEnabled ? [{ id: 'teams' as const, label: 'Teams', active: isTeamsOpen, onClick: () => setIsTeamsOpen(o => !o) }] : []),
+        ...(gameState.settings.workersEnabled ? [{ id: 'workers' as const, label: 'Workers', active: isWorkerPanelOpen, onClick: () => setIsWorkerPanelOpen(o => !o) }] : [])
       ]} />
 
       {/* Trading (kit TradeSheet via adapter) */}

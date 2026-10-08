@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, ScrollText, Handshake, UsersRound } from 'lucide-react';
+import { Home, Users, ScrollText, Handshake, UsersRound, HardHat } from 'lucide-react';
 import { formatSignedMoney } from '@/lib/utils';
 import type { GameEvent, GameState, Player } from '@/types/game';
 
@@ -62,10 +62,11 @@ export const InlineLog: React.FC<{ events: GameEvent[] }> = ({ events }) => (
   </ol>
 );
 
-export type NavId = 'properties' | 'players' | 'log' | 'trade' | 'teams';
+export type NavId = 'properties' | 'players' | 'log' | 'trade' | 'teams' | 'workers';
 const navIcons: Record<NavId, React.ReactNode> = {
   properties: <Home className="w-5 h-5" aria-hidden />, players: <Users className="w-5 h-5" aria-hidden />,
-  log: <ScrollText className="w-5 h-5" aria-hidden />, trade: <Handshake className="w-5 h-5" aria-hidden />, teams: <UsersRound className="w-5 h-5" aria-hidden />
+  log: <ScrollText className="w-5 h-5" aria-hidden />, trade: <Handshake className="w-5 h-5" aria-hidden />, teams: <UsersRound className="w-5 h-5" aria-hidden />,
+  workers: <HardHat className="w-5 h-5" aria-hidden />
 };
 
 /** Phone bottom navigation: always-visible, labelled buttons that open the sheets. */

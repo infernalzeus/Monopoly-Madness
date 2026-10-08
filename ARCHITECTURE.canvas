@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    { "id": "title", "type": "text", "x": -80, "y": -420, "width": 1700, "height": 110,
+      "text": "# Monopoly Madness Auction — architecture (v1.1.14)\nReact + TS + Vite on Vercel · Firestore doc `games/{room}` = the ONLY shared state · one pure engine · every write is a transaction · UI = presentation kit + thin adapters\n**Keep this canvas current: update it in the same commit as any structural change (checklist in arch.md).**" },
+
+    { "id": "deploy", "type": "text", "x": -80, "y": -270, "width": 520, "height": 200, "color": "6",
+      "text": "**Deploy**\nGitHub `main` → Vercel auto-build → monopoly-madness.vercel.app\nVercel env vars: 7× `VITE_FIREBASE_*` (missing ⇒ the app shows a 'not configured' screen, not a blank page)\nFirebase console: Anonymous auth ON · Firestore rules = `firestore.rules` · API key restricted to the 3 sites" },
+
+    { "id": "fb", "type": "text", "x": 520, "y": 870, "width": 560, "height": 290, "color": "6",
+      "text": "**Firestore `games/{room}`** (+ `lib/firebase.ts`)\n`gameState` · `status` waiting|playing|ended (derived from phase) · `hostUid` · `members.{uid}` (only seated uids may write) · `playerPresence.{id}` · `clockProbe.{uid}`\nInit: `ignoreUndefinedProperties` (undefined used to reject writes — the guest-join bug) · anonymous `authReady` · default-off emulator switch (`VITE_USE_EMULATOR`, demo- projects only)\n`lib/clock.ts` `serverNow()` = Date.now() + offset from a server-timestamp probe" },
+
+    { "id": "lobby", "type": "text", "x": -80, "y": 0, "width": 400, "height": 250, "color": "4",
+      "text": "**LobbySystem.tsx**\nCreate / join by code · settings: auctions, trading, teams, blind pick, workers, mortgage, **Free Parking pot**, **supply limits**, timer, vs-Bot\nJoin & remove-seat = `runTransaction`; late joiners become spectators; seat bound to anonymous uid\nEnded rooms linger 1 h; host's browser cleans up" },
+
+    { "id": "game", "type": "text", "x": 380, "y": 0, "width": 520, "height": 330, "color": "4",
+      "text": "**MonopolyGame.tsx** (orchestrator)\n• `h-[100dvh]` one-screen layout, **no page scroll**\n• desktop: board column (turn strip + board) | **side dock** tabs Properties / Players / Log / Teams + Trade, Workers\n• phone: board → money strip → fixed **bottom nav** → bottom sheets\n• Bot Noob effects (roll, build, buy, pay, bid, answer trades) · presence + clock probe · toasts, sounds, DoublesBanner, host 'Skip their turn'\n• setup screen = kit WaitingRoom; game over = kit GameOverCard (+ host Rematch)" },
+
+    { "id": "adapters", "type": "text", "x": 960, "y": 0, "width": 560, "height": 330, "color": "3",
+      "text": "**Adapters** (`components/game/`) — map GameState → kit props, own no rules\n`StageHost` ONE action owns the board stage: jail → card → rent → own property → auction → purchase (phone = bottom sheet)\n`TradeHost` → TradeSheet · `SheetsHost` Workers / Teams / Portfolio / Players sheets, `PortfolioCards`, tile summary strip\n`SideDock` PlayersList, InlineLog, BottomNav\n`cardAdapters.ts` Property → card props (rent, monopoly, team boost, build/sell/mortgage actions + reasons)" },
+
+    { "id": "kit", "type": "text", "x": 960, "y": 380, "width": 560, "height": 330, "color": "3",
+      "text": "**UI kit** `src/ui-kit/` (presentation only, no Firebase/logic) — contract in `UI_KIT.md`\nActionStage, dialog bodies, AuctionStatus, TurnStatus, TradeSheet, LogSheet, Teams/Workers sheets, WaitingRoom, GameOverCard, tokens.css\n**Cards** `src/ui-kit/cards/` (`UI_CARDS.md`): PropertyCard mini/hand/full + InspectView (title deed, actions, portalled to body), RevealCard (Chance/Community flip), DoublesBanner, JailCard, CityArt (inline SVG skylines)\nBoard tile tap → deed (same as portfolio). No body scroll lock." },
+
+    { "id": "hook", "type": "text", "x": 380, "y": 380, "width": 520, "height": 440, "color": "5",
+      "text": "**useGameLogic.ts** (adapter: React ⇄ Firestore)\n`setGameState(updater)` → offline `useState` or `runTransaction`; updater gets the LIVE doc; returning prev ⇒ no write; failures ⇒ toast\n**Actions** all validated in-transaction: roll, buy/pass (→ bank auction), start/bid/resolve auction, trade, mortgage/build/sell, jail pay/stay/card, workers, teams (lock after round 1), rematch, draft driver\n**Effects**: turn timer (paused in auctions, 5 s takeover), 2 s auto-advance (+ any client if current player is out), auction countdown, draft driver (any human, staggered)\n`advanceTurn(expectTurn, expectEnd)` is idempotent" },
+
+    { "id": "core", "type": "text", "x": -80, "y": 300, "width": 440, "height": 500, "color": "2",
+      "text": "**gameEngine/core.ts** (pure)\n`rollDiceLogic` (doubles ×3 → jail) → `movePlayer` (GO 10%, workers via build rules, rent unless teammate, tax, card, jail, Free Parking pot)\n`advanceTurn` → `settlePending` (rent/card can't be dodged; rent to an out player is waived); doubles ⇒ roll again\n`applyPayment` single bankruptcy path (+ `autoLiquidate`: sell buildings, then mortgage) → neutral tiles, workers cleared, trades rejected → `checkWinCondition` (last player / last team)\nRules: `buildLevel` `canBuildHouseOn/HotelOn/SellBuildingOn` (supply limits 32/12) `mortgagePayout` `unmortgageCost` `sameTeam` `hasBuildingsInGroup` `computeRent`" },
+
+    { "id": "types", "type": "text", "x": -80, "y": 850, "width": 400, "height": 210, "color": "0",
+      "text": "**types/game.ts**\nGameState · Property · Player (`uid`, `jailCards`, `isSpectator`) · Auction · TradeOffer · Worker · PendingCard (`jailCard`) · GameSettings (+ `freeParkingPot`, `supplyLimits`) · `freeParkingPot`, `winnerTeamId`\nOwnership is keyed by player NAME — names are unique per room." },
+
+    { "id": "phase", "type": "text", "x": 1560, "y": 0, "width": 440, "height": 220, "color": "1",
+      "text": "**gamePhase**\n`setup` → (auctions + draft queue) `auction` draft → `playing` → `ended` (→ Rematch → `setup`)\nTimer, auto-advance, bots, jail only run in `playing`; every phase has a driver.\n`turnState`: waiting_for_roll → processing → waiting_for_action (purchase | rent | card | own property) → completed → advance" },
+
+    { "id": "auction", "type": "text", "x": 1560, "y": 260, "width": 440, "height": 260, "color": "3",
+      "text": "**Auctions**\nPass (auctions on) ⇒ bank auction · draft auctions consume no turn\nstart pauses the turn clock; identity = `startTime`; bids validated live (>current, balance, not seller); late bid ⇒ ≥15 s; first transaction to resolve wins; winner must still afford it\nseller 'Start auction' UI removed (hook path kept)" },
+
+    { "id": "rules", "type": "text", "x": 1560, "y": 560, "width": 440, "height": 250, "color": "3",
+      "text": "**Rule decisions** (change in the named place)\nDecline→bank auction (`skipPurchase`) · seller start-bid floor 10% · bankrupt tiles neutral (owner kept, no rent/buy) · rent owed to an out player waived · alliances lock after round 1 · jail card on Chance/CC doubles · hotel sell-back needs 4 free houses when limits on" },
+
+    { "id": "tests", "type": "text", "x": 960, "y": 760, "width": 560, "height": 300, "color": "1",
+      "text": "**Tests & tooling**\n`audit/offline-checks.cjs` (26 engine/hook checks) · `audit/ui-preview.cjs` (SSR fixtures; can't catch effect/closure bugs — play the real app!) · `playtest/` Codex emulator harness + `REPORT.md` · `AUDIT_PROMPT.md`, `PLAYTEST_PROMPT.md`, `UI_PROMPT.md`, `UI_KIT_PROMPT.md`, `UI_CARDS_PROMPT.md`\nVerify: `npx tsc -p tsconfig.app.json --noEmit` (6 known Radix errors) · `npx vite build`" },
+
+    { "id": "inv", "type": "text", "x": -80, "y": 1110, "width": 700, "height": 270, "color": "1",
+      "text": "**Invariants (do not regress)**\n1. Decide inside the `setGameState` updater, never from closure state (and list every value the callback reads in its deps — stale `gamePhase` broke Roll Dice).\n2. One bankruptcy path; one rules module for build/mortgage.\n3. Anything that ends a turn settles pending rent/cards first.\n4. Timers idempotent + tolerate absent players; modal stages never lock page scroll.\n5. The dice display is always rendered; the action stage is layered ON TOP of it.\n6. Never write `undefined` into Firestore documents." },
+
+    { "id": "gaps", "type": "text", "x": 700, "y": 1210, "width": 920, "height": 220, "color": "1",
+      "text": "**Open**\nA02 a seated player can still write any state (needs Cloud Functions/server) · seller custom-bid auction button removed — decide · Trade screen still lists properties (TradeCardPicker unwired) · board tiles are still the old map · team name via browser prompt · bot doesn't mortgage or trade proactively · timers use an estimated server offset, not authoritative time" }
+  ],
+  "edges": [
+    { "id": "e0", "fromNode": "deploy", "fromSide": "bottom", "toNode": "lobby", "toSide": "top", "label": "browser loads app" },
+    { "id": "e1", "fromNode": "lobby", "fromSide": "right", "toNode": "game", "toSide": "left", "label": "create / join" },
+    { "id": "e2", "fromNode": "game", "fromSide": "right", "toNode": "adapters", "toSide": "left", "label": "ctx + callbacks" },
+    { "id": "e3", "fromNode": "adapters", "fromSide": "bottom", "toNode": "kit", "toSide": "top", "label": "presentational props" },
+    { "id": "e4", "fromNode": "game", "fromSide": "bottom", "toNode": "hook", "toSide": "top", "label": "useGameLogic(room, me)" },
+    { "id": "e5", "fromNode": "hook", "fromSide": "left", "toNode": "core", "toSide": "right", "label": "pure transitions" },
+    { "id": "e6", "fromNode": "hook", "fromSide": "bottom", "toNode": "fb", "toSide": "top", "label": "runTransaction ⇅ onSnapshot" },
+    { "id": "e7", "fromNode": "core", "fromSide": "bottom", "toNode": "types", "toSide": "top" },
+    { "id": "e8", "fromNode": "adapters", "fromSide": "right", "toNode": "phase", "toSide": "left", "label": "reads" },
+    { "id": "e9", "fromNode": "phase", "fromSide": "bottom", "toNode": "auction", "toSide": "top" },
+    { "id": "e10", "fromNode": "auction", "fromSide": "bottom", "toNode": "rules", "toSide": "top" },
+    { "id": "e11", "fromNode": "kit", "fromSide": "bottom", "toNode": "tests", "toSide": "top", "label": "previews" },
+    { "id": "e12", "fromNode": "types", "fromSide": "bottom", "toNode": "inv", "toSide": "top", "color": "1" },
+    { "id": "e13", "fromNode": "tests", "fromSide": "bottom", "toNode": "gaps", "toSide": "top", "color": "1" }
+  ]
+}
