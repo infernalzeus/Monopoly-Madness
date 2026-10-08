@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.13`**  
+> **Current Version: `v1.1.14`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,12 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.14 — one-screen layout (no page scrolling)
+
+`MonopolyGame` is now a `h-[100dvh]` flex column. **Desktop:** header → [board column with the turn strip above it | side dock]. The side dock (`flex-1`, 380–680 px) has tabs **Properties** (the existing `PlayerPanel` — cash, net worth — with the property **cards rendered inside its Properties section** via `cardsSlot`), **Players** (`PlayersList`), **Log** (`InlineLog`) and **Teams**, plus a Trade button with a badge for offers addressed to you. The separate card panel, mode pills, the Players Overview table, the floating Game Log button and the old bottom section are gone. **Phone:** header → turn strip → board → money strip → fixed **bottom nav** (Properties / Players / Log, plus Trade and Teams when enabled) opening bottom sheets; tapping a tile shows a summary floating above the nav. Cards are `mini` (3 per row) when you own more than 4, `hand` otherwise, one flowing list ordered by colour group. New files: `SideDock.tsx`, `PlayersSheet` in `SheetsHost.tsx`.
 
 ---
 

@@ -4,8 +4,9 @@ import {
   type WorkerAssignment, type TeamSummary, type PlayerIdentityProps
 } from '@/ui-kit';
 import { computeRent } from '@/gameEngine/core';
-import { CardRail, JailCard } from '@/ui-kit/cards';
+import { PropertyCard, JailCard } from '@/ui-kit/cards';
 import { SheetShell, Fact, CurrencyAmount, PlayerIdentity } from '@/ui-kit';
+import { PlayersList } from './SideDock';
 import { cardProps, identityOf, type CardCtx } from './cardAdapters';
 import type { GameState, Player, Property } from '@/types/game';
 
@@ -86,22 +87,28 @@ export const TeamsHost: React.FC<TeamsHostProps> = ({ gameState, me, onClose, jo
 };
 
 /* ───────────────────────── Portfolio (property cards) ───────────────────────── */
-/** The player's properties as inspectable cards (rail on phones, fan on desktop). Presentation order is local UI state. */
+/**
+ * The player's properties as inspectable cards, grouped by colour. Compact by design: mini cards (3 per row in the
+ * sidebar, 3-4 per row in the phone sheet) so a whole portfolio fits without page scrolling; tap a card for its title deed.
+ */
 export const PortfolioCards: React.FC<{ ctx: CardCtx; spendJailCard?: () => void }> = ({ ctx, spendJailCard }) => {
-  const [order, setOrder] = useState<string[]>([]);
   const { state, me } = ctx;
-  const owned = state.properties.filter(p => p.owner === me.name);
-  const sorted = [...owned].sort((a, b) => {
-    const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
-    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.position - b.position;
-  });
+  const owned = state.properties.filter(p => p.owner === me.name).sort((a, b) => a.position - b.position);
+  const size = owned.length <= 4 ? 'hand' : 'mini';
+  const ORDER = ['brown', 'lightBlue', 'pink', 'orange', 'red', 'yellow', 'green', 'darkBlue', 'railroad', 'utility'];
+  const rank = (p: typeof owned[number]) => { const i = ORDER.indexOf(p.colorGroup ?? p.type); return i < 0 ? 99 : i; };
+  const sortedCards = [...owned].sort((a, b) => rank(a) - rank(b) || a.position - b.position);
   return (
-    <>
+    <div className="mma-ui space-y-3">
       {(me.jailCards || 0) > 0 && <JailCard count={me.jailCards || 0} onUse={me.isInJail && ctx.isMyTurn ? spendJailCard : undefined} />}
-      {sorted.length === 0
-        ? <p className="mma-ui mma-muted">You don't own any properties yet — land on one and buy it, or win one at auction.</p>
-        : <CardRail cards={sorted.map(p => cardProps(ctx, p, 'hand'))} onReorder={setOrder} label="Your property cards" />}
-    </>
+      {owned.length === 0 ? (
+        <p className="text-sm text-slate-400 py-6 text-center">No properties yet — land on one and buy it, or win one at auction.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2" role="list" aria-label="Your property cards">
+          {sortedCards.map(p => <div role="listitem" key={p.id}><PropertyCard {...cardProps(ctx, p, size)} /></div>)}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -113,10 +120,10 @@ export const PortfolioHost: React.FC<PortfolioHostProps> = ({ ctx, onClose, spen
   return (
     <SheetShell title="Your portfolio" open onClose={onClose}>
       <PlayerIdentity {...identityOf(state, me, me)} />
-      <div className="mma-facts">
-        <Fact label="Cash"><CurrencyAmount amount={me.balance} /></Fact>
-        <Fact label="Net worth"><CurrencyAmount amount={worth(me)} /></Fact>
-        <Fact label="Rank">#{rank}</Fact>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-slate-800 py-1.5"><div className="text-[0.7rem] text-slate-400">Cash</div><div className="text-sm font-bold"><CurrencyAmount amount={me.balance} /></div></div>
+        <div className="rounded-lg bg-slate-800 py-1.5"><div className="text-[0.7rem] text-slate-400">Net worth</div><div className="text-sm font-bold"><CurrencyAmount amount={worth(me)} /></div></div>
+        <div className="rounded-lg bg-slate-800 py-1.5"><div className="text-[0.7rem] text-slate-400">Rank</div><div className="text-sm font-bold">#{rank}</div></div>
       </div>
       <PortfolioCards ctx={ctx} spendJailCard={spendJailCard} />
     </SheetShell>
@@ -129,4 +136,8 @@ export const TileSummaryStrip: React.FC<{ gameState: GameState; property: Proper
     name={property.name} price={property.currentValue} ownerName={property.isOwned ? property.owner : undefined}
     isMortgaged={property.isMortgaged} isInactive={property.isInactive} {...rentOf(gameState, property)} onDetails={onDetails}
   />
+);
+
+export const PlayersSheet: React.FC<{ state: GameState; me: Player; onClose: () => void }> = ({ state, me, onClose }) => (
+  <SheetShell title="Players" open onClose={onClose}><PlayersList state={state} me={me} /></SheetShell>
 );

@@ -179,6 +179,8 @@ interface PlayerPanelProps {
   onMortgage: (propertyId: string) => void;
   onUnmortgage?: (propertyId: string) => void;
   workersEnabled?: boolean;
+  /** When provided, the property cards render here instead of the legacy mini tiles */
+  cardsSlot?: React.ReactNode;
 }
 
 const PlayerPanel: React.FC<PlayerPanelProps> = ({
@@ -189,6 +191,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   onMortgage,
   onUnmortgage,
   workersEnabled = false,
+  cardsSlot,
 }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [colorOrder, setColorOrder] = useState<string[]>(DEFAULT_COLOR_ORDER);
@@ -246,7 +249,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   };
 
   return (
-    <Card className="bg-gradient-to-br from-gray-800 to-gray-700 border-gray-600">
+    <Card className="bg-slate-900 border-slate-700">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-white text-sm">
           <div className="flex items-center gap-2">
@@ -263,11 +266,11 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
       <CardContent className="space-y-3 pt-0">
         {/* Finances */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="bg-gray-700/50 rounded-lg p-2">
+          <div className="bg-slate-800 rounded-lg p-2">
             <div className="text-xs text-gray-400">Cash</div>
             <div className="text-sm font-bold text-cyan-400">${currentPlayer.balance.toLocaleString('en-US')}</div>
           </div>
-          <div className="bg-gray-700/50 rounded-lg p-2">
+          <div className="bg-slate-800 rounded-lg p-2">
             <div className="text-xs text-gray-400">Net Worth</div>
             <div className="text-sm font-bold text-white">${netWorth.toLocaleString('en-US')}</div>
           </div>
@@ -278,14 +281,14 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
           <h3 className="font-semibold text-white text-sm flex items-center gap-2 mb-1.5">
             <Home className="w-3.5 h-3.5" />
             Properties ({ownedProperties.length})
-            {ownedProperties.length > 1 && (
+            {!cardsSlot && ownedProperties.length > 1 && (
               <span className="text-[0.6rem] text-slate-500 font-normal ml-auto flex items-center gap-0.5">
                 <GripVertical className="w-3 h-3" />drag groups to reorder
               </span>
             )}
           </h3>
 
-          {ownedProperties.length === 0 ? (
+          {cardsSlot ? cardsSlot : ownedProperties.length === 0 ? (
             <div className="text-center py-4 text-slate-500 text-xs">
               <Home className="w-6 h-6 mx-auto mb-1 opacity-40" />
               No properties owned yet

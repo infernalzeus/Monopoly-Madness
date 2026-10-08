@@ -21,7 +21,8 @@ import type { CardCtx } from './cardAdapters';
 import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
 import StageHost from './StageHost';
 import TradeHost from './TradeHost';
-import { WorkersHost, TeamsHost, PortfolioHost, PortfolioCards, TileSummaryStrip } from './SheetsHost';
+import { WorkersHost, TeamsHost, PortfolioHost, PortfolioCards, PlayersSheet, TileSummaryStrip } from './SheetsHost';
+import { PlayersList, InlineLog, BottomNav } from './SideDock';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { useGameLogic, getInitialState } from '@/hooks/useGameLogic';
 import { Property, GameMode, GameSettings, GameEvent, GameState, Player } from '@/types/game';
@@ -75,6 +76,8 @@ const MonopolyGame: React.FC = () => {
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [doublesBanner, setDoublesBanner] = useState<'double' | 'triple' | null>(null);
   const [isTeamsOpen, setIsTeamsOpen] = useState(false);
+  const [isPlayersOpen, setIsPlayersOpen] = useState(false);
+  const [sideTab, setSideTab] = useState<'properties' | 'players' | 'log' | 'teams'>('properties');
   const [summaryProperty, setSummaryProperty] = useState<Property | null>(null);
   useEffect(() => { authReady.then(() => setAuthChecked(true)); }, []);
   // Player presence: maps playerId → last heartbeat epoch (stored outside gameState in Firestore)
@@ -883,7 +886,7 @@ const MonopolyGame: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 p-4 text-slate-100">
+    <div className="h-[100dvh] flex flex-col gap-2 bg-slate-950 p-2 lg:p-3 text-slate-100 overflow-hidden">
       {/* Screen-reader status: whose turn + latest event (polite, so it never interrupts) */}
       <div className="sr-only" role="status" aria-live="polite">
         {gameState.gamePhase === 'ended' ? 'Game over.' : `${currentPlayer.name}'s turn.`}{' '}
@@ -971,16 +974,16 @@ const MonopolyGame: React.FC = () => {
       {/* Dialogs & Overlays removed from global space to board space */}
       
       {/* Game Header — compact single row */}
-      <Card className="mb-3 bg-slate-900 border border-slate-800 shadow-md py-0">
-        <CardHeader className="py-2 px-4">
+      <Card className="shrink-0 bg-slate-900 border border-slate-800 shadow-md py-0">
+        <CardHeader className="py-1.5 px-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <img src="/favicon.svg" alt="Monopoly Madness Icon" className="w-6 h-6 animate-pulse" />
-              <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500">Monopoly Madness</span>
+              <span className="text-base sm:text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500">Monopoly Madness</span>
               <Badge className="bg-emerald-900/50 border-emerald-500/50 text-emerald-300 font-mono px-3 border-2 shadow-sm text-sm">
                 {lobbyCode}
               </Badge>
-              <Badge className="bg-indigo-900/50 text-indigo-300 border border-indigo-700/50 px-2 flex items-center gap-1 text-xs">
+              <Badge className="hidden sm:flex bg-indigo-900/50 text-indigo-300 border border-indigo-700/50 px-2 items-center gap-1 text-xs">
                 <span dangerouslySetInnerHTML={{__html: myPlayer.pieceIcon}} />
                 <span>{myPlayer.name}</span>
               </Badge>
@@ -1010,8 +1013,11 @@ const MonopolyGame: React.FC = () => {
         </CardHeader>
       </Card>
 
+      {/* Main layout: board + side dock (desktop) / bottom nav (phone). Everything fits one screen — no page scrolling. */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2 lg:gap-3">
+        <div className="min-h-0 min-w-0 flex flex-col items-stretch justify-start gap-2 lg:flex-none lg:w-[min(100%,calc(100dvh-236px))]">
       {/* Turn strip: whose turn, what is expected, shared countdown */}
-      <div className="mb-3">
+      <div className="shrink-0">
         <TurnStatus
           actorName={currentPlayer.name}
           isMine={isMyTurn}
@@ -1039,23 +1045,19 @@ const MonopolyGame: React.FC = () => {
         const seen = playerPresence[currentPlayer.id];
         const away = !currentPlayer.isBot && !isMyTurn && gameState.gamePhase === 'playing' && !gameState.currentAuction && (!seen || Date.now() - seen > 45000);
         return away && isLobbyOwner ? (
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/50 bg-amber-950/40 p-3 text-sm text-amber-100">
+          <div className="shrink-0 flex items-center justify-between gap-3 rounded-xl border border-amber-500/50 bg-amber-950/40 p-3 text-sm text-amber-100">
             <span>{currentPlayer.name} looks disconnected.</span>
             <button onClick={endTurn} className="min-h-[44px] px-4 rounded-lg bg-amber-500 text-slate-950 font-bold">Skip their turn</button>
           </div>
         ) : null;
       })()}
 
-      {/* Main Game Layout */}
-      <div className="flex flex-col gap-6">
-        {/* Top/Main Area - Game Board and Dice */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <div className="w-full lg:w-3/4 flex flex-col items-center gap-2">
           {showWorkerNudge && (
             <div role="status" className="w-full max-w-4xl bg-amber-900/80 border border-amber-500/60 text-amber-100 text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg text-center">
               Assign workers before rolling — open Workers in the header
             </div>
           )}
+          <div className="w-full max-w-[calc(100dvh-272px)] mx-auto lg:max-w-none">
           <MonopolyBoardLayout
             properties={gameState.properties}
             players={gameState.players}
@@ -1135,46 +1137,27 @@ const MonopolyGame: React.FC = () => {
               ) : null}
             />
           </MonopolyBoardLayout>
-          {summaryProperty && (() => {
-            const live = gameState.properties.find(p => p.id === summaryProperty.id) ?? summaryProperty;
-            return (
-              <div className="w-full max-w-4xl lg:hidden">
-                <TileSummaryStrip gameState={gameState} property={live} onDetails={() => setSelectedProperty(live)} />
-              </div>
-            );
-          })()}
           </div>
-          
-            <div className="w-full lg:w-1/4 space-y-6">
-              {/* Active Mode Pills */}
-              <div className="flex flex-wrap gap-1 justify-center">
-                {[
-                  gameState.settings.auctionsEnabled   && { label: '🔨 Auctions',    bg: 'bg-yellow-700/80 border-yellow-500/60' },
-                  gameState.settings.teamsEnabled       && { label: '🤝 Teams',        bg: 'bg-indigo-700/80 border-indigo-500/60' },
-                  gameState.settings.tradingEnabled     && { label: '🔄 Trading',      bg: 'bg-green-700/80 border-green-500/60' },
-                  gameState.settings.workersEnabled     && { label: '👷 Workers',      bg: 'bg-amber-700/80 border-amber-500/60' },
-                  gameState.settings.allowPropertyEditing && { label: '✏️ Editor',     bg: 'bg-purple-700/80 border-purple-500/60' },
-                  gameState.settings.blindPickEnabled   && { label: '🙈 Blind Pick',   bg: 'bg-slate-600/80 border-slate-400/60' },
-                  gameState.settings.mortgageEnabled    && { label: '🏦 Mortgage',     bg: 'bg-rose-700/80 border-rose-500/60' },
-                  !gameState.settings.auctionsEnabled && !gameState.settings.teamsEnabled && !gameState.settings.tradingEnabled
-                    && { label: '🎲 Classic',     bg: 'bg-cyan-700/80 border-cyan-500/60' },
-                ].filter(Boolean).map((m: any) => (
-                  <span key={m.label} className={`text-[0.65rem] font-semibold text-white px-2 py-0.5 rounded-full border ${m.bg}`}>
-                    {m.label}
-                  </span>
-                ))}
-              </div>
-              
-              {/* Phone shortcuts: portfolio / teams / workers open as bottom sheets */}
-              <div className="flex flex-wrap gap-2 lg:hidden">
-                <button onClick={() => setIsPortfolioOpen(true)} className="min-h-[44px] px-4 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-semibold">My properties</button>
-                {gameState.settings.teamsEnabled && (
-                  <button onClick={() => setIsTeamsOpen(true)} className="min-h-[44px] px-4 rounded-lg bg-indigo-900/70 border border-indigo-500/60 text-indigo-100 text-sm font-semibold">Teams</button>
-                )}
-              </div>
+        </div>
 
-              {/* My Portfolio (desktop; phones use the sheet) */}
-              <div className="hidden lg:block">
+        {/* Desktop side dock: portfolio cards / players / log / teams as tabs */}
+        <aside className="hidden lg:flex flex-1 min-w-[380px] max-w-[680px] min-h-0 flex-col rounded-xl border border-slate-700 bg-slate-900/70">
+          <div role="tablist" aria-label="Game panels" className="shrink-0 flex gap-1 p-1.5 border-b border-slate-700">
+            {([
+              ['properties', 'Properties'], ['players', 'Players'], ['log', 'Log'],
+              ...(gameState.settings.teamsEnabled ? [['teams', 'Teams']] : [])
+            ] as [typeof sideTab, string][]).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={sideTab === id} onClick={() => setSideTab(id)}
+                className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${sideTab === id ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>{label}</button>
+            ))}
+            {gameState.settings.tradingEnabled && (
+              <button onClick={() => setIsTradingOpen(true)} className="relative min-h-[40px] px-3 rounded-lg text-sm font-semibold bg-purple-700 hover:bg-purple-600 text-white">
+                Trade{gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length > 0 && <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 text-xs">{gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length}</span>}
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-2">
+            {sideTab === 'properties' && (
               <PlayerPanel
                 currentPlayer={myPlayer}
                 allPlayers={gameState.players}
@@ -1183,158 +1166,59 @@ const MonopolyGame: React.FC = () => {
                 workersEnabled={gameState.settings.workersEnabled}
                 onMortgage={mortgageProperty}
                 onUnmortgage={unmortgageProperty}
+                cardsSlot={<PortfolioCards ctx={cardCtx} spendJailCard={spendJailCard} />}
               />
-              </div>
-              <div className="hidden lg:block rounded-xl bg-slate-900/80 border border-slate-700 p-3">
-                <PortfolioCards ctx={cardCtx} spendJailCard={spendJailCard} />
-              </div>
-
-              {/* Team Panel - Only visible if teams enabled */}
-              {gameState.settings.teamsEnabled && (
-                <div className="hidden lg:block"><TeamPanel
-                  currentPlayer={myPlayer}
-                  teams={gameState.teams}
-                  players={gameState.players}
-                  onJoinTeam={joinTeam}
-                  onCreateTeam={createTeam}
-                  locked={gameState.turn >= gameState.players.length}
-                /></div>
-              )}
-            </div>
-        </div>
-
-        {/* Bottom Section - Control Panels */}
-        <div className="flex flex-col gap-6">
-          {/* Only show relevant panels based on game state */}
-          {(gameState.gamePhase as string) !== 'setup' && (
-            <>
-              {/* Players Summary Table - Dark theme */}
-              <Card className="bg-black border border-slate-800 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Users className="w-5 h-5 text-blue-400" />
-                    Players Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-slate-800">
-                          <TableHead className="w-8 text-slate-300">#</TableHead>
-                          <TableHead className="text-slate-300">Player</TableHead>
-                          <TableHead className="text-slate-300">Cash</TableHead>
-                          <TableHead className="text-slate-300">Net Worth</TableHead>
-                          <TableHead className="text-slate-300 min-w-28">Properties</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {[...gameState.players]
-                          .map(p => {
-                            const propVal = gameState.properties.filter(prop => prop.owner === p.name).reduce((s, prop) => s + prop.currentValue, 0);
-                            return { ...p, netWorth: p.balance + propVal };
-                          })
-                          .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || b.netWorth - a.netWorth)
-                          .map((p, idx) => {
-                          const propsOwned = gameState.properties.filter(prop => prop.owner === p.name);
-                          const isCurrent = gameState.currentPlayer === p.id;
-                          const fmtNW = (n: number) => n >= 1000000 ? `$${(n/1000000).toFixed(2)}M` : n >= 1000 ? `$${(n/1000).toFixed(0)}K` : `$${n}`;
-                          return (
-                            <TableRow key={p.id} className={`border-slate-800 flex-1 ${isCurrent ? 'bg-slate-900/50' : ''} ${!p.isActive ? 'opacity-40' : ''}`}>
-                              <TableCell className="text-slate-400 font-bold text-sm">{idx + 1}</TableCell>
-                              <TableCell className="text-slate-100 font-medium">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg" style={{ color: p.color }} dangerouslySetInnerHTML={{__html: p.pieceIcon}} />
-                                  <span>{p.name} {p.id === localPlayerId ? '(You)' : ''}</span>
-                                  {isCurrent && (
-                                    <Badge className="ml-1 bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[0.65rem] px-1 py-0 uppercase">Turn</Badge>
-                                  )}
-                                  {p.isInJail && (
-                                    <Badge variant="destructive" className="ml-1 text-[0.65rem] px-1 py-0">Jail ({p.jailTurns})</Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-emerald-400 font-mono font-bold tracking-tight">{fmtNW(p.balance)}</TableCell>
-                              <TableCell className="text-cyan-300 font-mono font-bold tracking-tight">{fmtNW((p as any).netWorth)}</TableCell>
-                              <TableCell className="text-slate-200">
-                                {propsOwned.length === 0 ? (
-                                  <span className="text-slate-600 italic text-xs">None</span>
-                                ) : (
-                                  <div className="flex flex-wrap gap-1">
-                                    {propsOwned.map(op => (
-                                      <Badge key={op.id} variant="secondary" className="text-[0.65rem] bg-slate-800 text-slate-300 border-slate-700 py-0">
-                                        {op.name}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Trading (kit TradeSheet via adapter) */}
-              {isTradingOpen && (
-                <SheetDock>
-                  <TradeHost
-                    gameState={gameState} me={myPlayer} onClose={() => setIsTradingOpen(false)}
-                    createTradeOffer={createTradeOffer} acceptTradeOffer={acceptTradeOffer}
-                    rejectTradeOffer={rejectTradeOffer} cancelTradeOffer={cancelTradeOffer}
-                  />
-                </SheetDock>
-              )}
-
-              {/* Game Log Drawer Trigger */}
-              <div className="fixed bottom-4 right-4 z-[90]">
-                <Button 
-                  onClick={() => setIsLogOpen(true)} 
-                  className="bg-slate-800 text-white hover:bg-slate-700 shadow-xl border border-slate-600 flex items-center gap-2 px-6 py-4 rounded-full"
-                >
-                  📜 <span className="hidden sm:inline">Game Log</span>
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Pre-Auction Dialog */}
-          <Dialog open={showPreAuctionDialog} onOpenChange={setShowPreAuctionDialog}>
-            <DialogContent className="max-w-md bg-slate-900 border-2 border-yellow-500 text-white">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold text-yellow-500 flex items-center gap-3">
-                  <Gavel className="w-6 h-6" />
-                  Pre-Auction Phase
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <p className="text-slate-300">
-                  Auction mode is enabled! You will now bid for properties before starting the standard game.
-                </p>
-                <div className="bg-yellow-500/10 p-4 rounded-lg border border-yellow-500/20">
-                  <h4 className="font-bold text-yellow-400 mb-2">Rules:</h4>
-                  <ul className="text-sm text-slate-300 space-y-2">
-                    <li className="flex gap-2"><span>•</span> <span>Starting bids are 70% of market value.</span></li>
-                    <li className="flex gap-2"><span>•</span> <span>Highest bidder wins property instantly.</span></li>
-                    <li className="flex gap-2"><span>•</span> <span>Main game starts after all properties are auctioned.</span></li>
-                  </ul>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button 
-                  onClick={handleStartGame}
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-6 text-lg"
-                >
-                  Start Bidding
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+            )}
+            {sideTab === 'players' && <PlayersList state={gameState} me={myPlayer} />}
+            {sideTab === 'log' && <InlineLog events={gameState.gameEvents} />}
+            {sideTab === 'teams' && gameState.settings.teamsEnabled && (
+              <TeamPanel currentPlayer={myPlayer} teams={gameState.teams} players={gameState.players}
+                onJoinTeam={joinTeam} onCreateTeam={createTeam} locked={gameState.turn >= gameState.players.length} />
+            )}
+          </div>
+        </aside>
       </div>
+
+      {/* Phone: always-visible money strip */}
+      <div className="lg:hidden shrink-0 flex items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm">
+        <span className="text-slate-400">Cash <strong className="text-cyan-300 font-mono">${myPlayer.balance.toLocaleString('en-US')}</strong></span>
+        <span className="text-slate-400">Worth <strong className="text-white font-mono">${(myPlayer.balance + myOwnedProperties.filter(p => !p.isInactive).reduce((a, p) => a + p.currentValue, 0)).toLocaleString('en-US')}</strong></span>
+        <span className="text-slate-400">{myOwnedProperties.length} props</span>
+      </div>
+
+      {/* Phone: selected-tile summary floats above the nav; labelled nav buttons open the sheets */}
+      {summaryProperty && (() => {
+        const live = gameState.properties.find(p => p.id === summaryProperty.id) ?? summaryProperty;
+        return (
+          <div className="lg:hidden fixed inset-x-2 bottom-[84px] z-[60] rounded-xl bg-slate-900 border border-slate-600 shadow-2xl">
+            <button aria-label="Dismiss tile summary" onClick={() => setSummaryProperty(null)} className="absolute -top-3 -right-1 z-10 h-8 w-8 rounded-full bg-slate-700 text-slate-100 text-sm no-touch-min">✕</button>
+            <TileSummaryStrip gameState={gameState} property={live} onDetails={() => setSelectedProperty(live)} />
+          </div>
+        );
+      })()}
+      <BottomNav items={[
+        { id: 'properties', label: 'Properties', active: isPortfolioOpen, onClick: () => setIsPortfolioOpen(o => !o) },
+        { id: 'players', label: 'Players', active: isPlayersOpen, onClick: () => setIsPlayersOpen(o => !o) },
+        { id: 'log', label: 'Log', active: isLogOpen, onClick: () => setIsLogOpen(o => !o) },
+        ...(gameState.settings.tradingEnabled ? [{ id: 'trade' as const, label: 'Trade', badge: gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length, active: isTradingOpen, onClick: () => setIsTradingOpen(o => !o) }] : []),
+        ...(gameState.settings.teamsEnabled ? [{ id: 'teams' as const, label: 'Teams', active: isTeamsOpen, onClick: () => setIsTeamsOpen(o => !o) }] : [])
+      ]} />
+
+      {/* Trading (kit TradeSheet via adapter) */}
+      {isTradingOpen && (
+        <SheetDock>
+          <TradeHost
+            gameState={gameState} me={myPlayer} onClose={() => setIsTradingOpen(false)}
+            createTradeOffer={createTradeOffer} acceptTradeOffer={acceptTradeOffer}
+            rejectTradeOffer={rejectTradeOffer} cancelTradeOffer={cancelTradeOffer}
+          />
+        </SheetDock>
+      )}
+      {isPlayersOpen && (
+        <SheetDock>
+          <PlayersSheet state={gameState} me={myPlayer} onClose={() => setIsPlayersOpen(false)} />
+        </SheetDock>
+      )}
 
       {/* Workers (kit WorkersSheet via adapter) */}
       {gameState.settings.workersEnabled && isWorkerPanelOpen && (
