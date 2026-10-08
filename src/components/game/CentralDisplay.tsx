@@ -17,6 +17,7 @@ import {
 import { GameEvent, DiceRoll } from '@/types/game';
 import { formatSignedMoney, readableTextOn } from '@/lib/utils';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { Dice } from '@/ui-kit/polish';
 
 interface CentralDisplayProps {
   currentEvent: GameEvent | null;
@@ -186,8 +187,7 @@ const CentralDisplay: React.FC<CentralDisplayProps> = ({
         {/* Dice display — always visible once a roll happened or rolling */}
         {showDice && (
           <div className="flex items-center gap-2">
-            <DieFace value={d1} isRolling={isRolling} animDelay={0} />
-            <DieFace value={d2} isRolling={isRolling} animDelay={30} />
+            <Dice values={[d1, d2]} rolling={isRolling} doubles={!isRolling && !!lastDiceRoll?.isDouble} />
             {!isRolling && lastDiceRoll && (
               <span className="text-base sm:text-lg font-black text-white ml-1">
                 = {lastDiceRoll.total}

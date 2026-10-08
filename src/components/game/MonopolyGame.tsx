@@ -15,6 +15,8 @@ import { setClockOffset } from '@/lib/clock';
 import { readableTextOn } from '@/lib/utils';
 import '@/ui-kit/tokens.css';
 import '@/ui-kit/cards/tokens.css';
+import '@/ui-kit/polish/tokens.css';
+import { TurnBanner, NavBar, GameOverStage, PlayerCard, MoneyDelta } from '@/ui-kit/polish';
 import { DoublesBanner, InspectView } from '@/ui-kit/cards';
 import { cardProps, type CardCtx } from './cardAdapters';
 import { TurnStatus, GameOverCard, WaitingRoom, LogSheet } from '@/ui-kit';
@@ -279,6 +281,20 @@ const MonopolyGame: React.FC = () => {
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rollKey]);
+
+  // Floating "+$120K / −$80K" next to my balance whenever it changes
+  const myBalance = gameState.players.find(p => p.id === localPlayerId)?.balance;
+  const prevBalance = React.useRef<number | undefined>(undefined);
+  const [moneyDelta, setMoneyDelta] = useState<{ amount: number; key: number } | null>(null);
+  useEffect(() => {
+    if (myBalance === undefined) return;
+    const prev = prevBalance.current;
+    prevBalance.current = myBalance;
+    if (prev === undefined || prev === myBalance) return;
+    setMoneyDelta({ amount: myBalance - prev, key: Date.now() });
+    const t = setTimeout(() => setMoneyDelta(null), 2200);
+    return () => clearTimeout(t);
+  }, [myBalance]);
 
   // Escape closes the property / special-tile overlays
   useEffect(() => {
@@ -901,17 +917,17 @@ const MonopolyGame: React.FC = () => {
         return (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Game over">
             <div className="w-full max-w-lg space-y-3">
-              <GameOverCard
-                winnerName={winner?.name ?? 'Nobody'}
-                winnerTeamName={winTeam?.name}
+              <GameOverStage
+                winner={winner ? { id: winner.id, name: winner.name, color: winner.color, token: winner.pieceIcon } : { id: 'none', name: 'Nobody', color: '#94a3b8' }}
+                winnerLabel={winTeam?.name ? `Team ${winTeam.name}` : (winner?.name ?? 'Nobody')}
                 standings={ordered.map((p, i) => ({
                   rank: i + 1, netWorth: worth(p),
-                  player: { name: p.name, color: p.color, icon: p.pieceIcon, marker: gameState.players.indexOf(p) + 1, isYou: p.id === localPlayerId, isBot: p.isBot, isBankrupt: !p.isActive }
+                  player: { id: p.id, name: p.name + (p.id === localPlayerId ? ' (you)' : ''), color: p.color, token: p.pieceIcon }
                 }))}
-                onBackToLobby={() => { window.location.href = window.location.pathname; }}
-                isHost={isLobbyOwner}
-                canRematch={isLobbyOwner}
-                onRematch={() => { setWinnerDismissed(false); rematch(); }}
+                actions={[
+                  ...(isLobbyOwner ? [{ id: 'rematch', label: 'Rematch', primary: true, onClick: () => { setWinnerDismissed(false); rematch(); } }] : []),
+                  { id: 'lobby', label: 'Back to lobby', primary: !isLobbyOwner, onClick: () => { window.location.href = window.location.pathname; } }
+                ]}
               />
               <button onClick={() => setWinnerDismissed(true)} className="w-full min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-600">View the final board</button>
             </div>
@@ -958,7 +974,7 @@ const MonopolyGame: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <img src="/favicon.svg" alt="Monopoly Madness Icon" className="w-6 h-6 animate-pulse" />
-              <span className="text-base sm:text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500">Monopoly Madness</span>
+              <span className="hidden sm:inline text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500">Monopoly Madness</span>
               <Badge className="bg-emerald-900/50 border-emerald-500/50 text-emerald-300 font-mono px-3 border-2 shadow-sm text-sm">
                 {lobbyCode}
               </Badge>
@@ -966,7 +982,7 @@ const MonopolyGame: React.FC = () => {
                 <span dangerouslySetInnerHTML={{__html: myPlayer.pieceIcon}} />
                 <span>{myPlayer.name}</span>
               </Badge>
-              <Badge className="bg-slate-800/80 text-slate-300 border border-slate-600 px-2 text-xs">
+              <Badge className="hidden sm:flex bg-slate-800/80 text-slate-300 border border-slate-600 px-2 text-xs">
                 Turn {gameState.turn + 1} · {gameState.players.filter(p => p.isActive).length} active
               </Badge>
             </div>
@@ -997,10 +1013,10 @@ const MonopolyGame: React.FC = () => {
         <div className="min-h-0 min-w-0 flex flex-col items-stretch justify-start gap-2 lg:flex-none lg:w-[min(100%,calc(100dvh-236px))]">
       {/* Turn strip: whose turn, what is expected, shared countdown */}
       <div className="shrink-0">
-        <TurnStatus
-          actorName={currentPlayer.name}
+        <TurnBanner
+          player={{ id: currentPlayer.id, name: currentPlayer.name, color: currentPlayer.color, token: currentPlayer.pieceIcon }}
           isMine={isMyTurn}
-          secondsLeft={turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && gameState.gamePhase === 'playing' && !gameState.currentAuction ? turnTimer : undefined}
+          seconds={turnTimer !== null && (gameState.settings.turnTimerDuration ?? 0) > 0 && gameState.gamePhase === 'playing' && !gameState.currentAuction ? turnTimer : undefined}
           totalSeconds={gameState.settings.turnTimerDuration || 60}
           phase={
             gameState.gamePhase === 'ended' ? 'Game over'
@@ -1140,7 +1156,20 @@ const MonopolyGame: React.FC = () => {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-2">
             {sideTab === 'properties' && (
+              <div className="relative mb-2">
+                <PlayerCard
+                  player={{ id: myPlayer.id, name: myPlayer.name, color: myPlayer.color, token: myPlayer.pieceIcon }}
+                  cash={myPlayer.balance}
+                  netWorth={myPlayer.balance + myOwnedProperties.filter(p => !p.isInactive).reduce((a, p) => a + p.currentValue, 0)}
+                  rank={1 + gameState.players.filter(p => p.isActive && !p.isSpectator && netWorthOf(gameState, p) > netWorthOf(gameState, myPlayer)).length}
+                  statuses={[myPlayer.isInJail ? `In jail (${myPlayer.jailTurns})` : '', (myPlayer.jailCards || 0) > 0 ? `${myPlayer.jailCards} jail card` : '', gameState.teams.find(t => t.id === myPlayer.teamId)?.name ?? ''].filter(Boolean)}
+                />
+                {moneyDelta && <div className="absolute right-3 top-2 pointer-events-none"><MoneyDelta key={moneyDelta.key} amount={moneyDelta.amount} /></div>}
+              </div>
+            )}
+            {sideTab === 'properties' && (
               <PlayerPanel
+                compactHeader
                 currentPlayer={myPlayer}
                 allPlayers={gameState.players}
                 ownedProperties={myOwnedProperties}
@@ -1179,14 +1208,14 @@ const MonopolyGame: React.FC = () => {
           </div>
         );
       })()}
-      <BottomNav items={[
+      <div className="lg:hidden shrink-0 [&_.mp-nav]:!w-full [&_.mp-nav]:![grid-template-columns:repeat(auto-fit,minmax(0,1fr))]"><NavBar items={([
         { id: 'properties', label: 'Properties', active: isPortfolioOpen, onClick: () => setIsPortfolioOpen(o => !o) },
         { id: 'players', label: 'Players', active: isPlayersOpen, onClick: () => setIsPlayersOpen(o => !o) },
         { id: 'log', label: 'Log', active: isLogOpen, onClick: () => setIsLogOpen(o => !o) },
         ...(gameState.settings.tradingEnabled ? [{ id: 'trade' as const, label: 'Trade', badge: gameState.tradeOffers.filter(o => o.status === 'pending' && o.toPlayer === myPlayer.name).length, active: isTradingOpen, onClick: () => setIsTradingOpen(o => !o) }] : []),
         ...(gameState.settings.teamsEnabled ? [{ id: 'teams' as const, label: 'Teams', active: isTeamsOpen, onClick: () => setIsTeamsOpen(o => !o) }] : []),
         ...(gameState.settings.workersEnabled ? [{ id: 'workers' as const, label: 'Workers', active: isWorkerPanelOpen, onClick: () => setIsWorkerPanelOpen(o => !o) }] : [])
-      ]} />
+      ] as any[]).map(it => ({ ...it, icon: ({ properties: 'house', players: 'players', log: 'log', trade: 'trade', teams: 'teams', workers: 'workers' } as Record<string, string>)[it.id] }))} /></div>
 
       {/* Trading (kit TradeSheet via adapter) */}
       {isTradingOpen && (

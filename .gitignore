@@ -32,3 +32,4 @@ playtest/env/.env.emulator
 playtest/artifacts/
 playtest/*-debug.log
 audit/ui-kit-preview/
+audit/ui-polish-preview/

@@ -24,7 +24,12 @@ function invariant(state, room, previous) {
     }
     if (state.gamePhase === 'playing') {
         const current = state.players.filter(p => p.id === state.currentPlayer && p.isActive && !p.isSpectator);
-        assert.equal(current.length, 1, 'current player is not active');
+        // Documented contract (arch.md v1.1.17): a player who goes bankrupt on their own turn stays `currentPlayer` in the
+        // `completed` grace state until advanceTurn (their client after 2 s, any client after 3.5 s) hands over. The
+        // invariant is therefore: current player is active, OR the turn is `completed` and the current player is out.
+        const everyone = state.players.find(p => p.id === state.currentPlayer);
+        const graceOk = state.turnState === 'completed' && everyone && !everyone.isActive;
+        assert.ok(current.length === 1 || graceOk, 'current player is not active (outside the completed grace state)');
     }
     assert.ok(!state.currentAuction || state.currentAuction.isActive, 'non-live auction in live auction slot');
     assert.ok(state.properties.filter(p => p.isInAuction).length <= 1, 'multiple live auction tiles');

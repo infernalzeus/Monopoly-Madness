@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.16`**  
+> **Current Version: `v1.1.17`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,14 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.17 — premium polish kit wired + bankruptcy state contract
+
+**Polish kit** (`src/ui-kit/polish/`, `UI_POLISH.md`) wired: **BoardTile + BoardFrame** replace the old tile renderer in `MonopolyBoardLayout` (short codes + SVG kinds, owner flag, houses/hotel pips, mortgage/neutral/auction/monopoly states; tokens stay on the existing `AnimatedToken` hop logic; the top edge is kept upright for phone readability) · **Dice** in `CentralDisplay` (the Roll button logic is unchanged) · **TurnBanner** (replaces `TurnStatus`) · **NavBar** (phone) · **PlayerCard** + **MoneyDelta** above the portfolio (`PlayerPanel compactHeader`) · **AuctionHall** in `StageHost` · **GameOverStage**. One rank for everyone (`netWorthOf`). Not wired: StageFrame/Hero/Stat accents, ListRow family, Toast/AchievementPop, EmptyState/Skeleton, DockTabs, Token/TokenStack (listed in the canvas).
+
+**Bankruptcy contract (documented, tested):** a player who goes bankrupt on their own turn stays `currentPlayer` in `turnState:'completed'` until `advanceTurn` (their client after 2 s, any client after 3.5 s) hands over — so the invariant is "current player is active, OR the turn is `completed` and they are out". Covered by an offline check and by `playtest/invariants.cjs`.
 
 ---
 

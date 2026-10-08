@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Property, Player, GameEvent, DiceRoll, Worker } from '@/types/game';
 import { Home, Hotel, Landmark, Building } from 'lucide-react';
 import CentralDisplay from './CentralDisplay';
+import { BoardTile, BoardFrame } from '@/ui-kit/polish';
+import { ownsFullGroup } from '@/gameEngine/core';
 
 
 interface MonopolyBoardLayoutProps {
@@ -197,196 +199,58 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
     return { row: 1, col: 1 };
   };
 
+  // Short map codes: initials for multi-word names, else the first three letters
+  const codeOf = (name: string) => {
+    const words = name.replace(/[^\p{L}\p{N} ]/gu, '').split(' ').filter(Boolean);
+    return (words.length > 1 ? words.map(w => w[0]).join('').slice(0, 3) : name.slice(0, 3)).toUpperCase();
+  };
+  const kindOf = (p: Property) =>
+    p.name === 'GO' ? 'go' : p.name === 'Jail' ? 'jail' : p.name === 'Free Parking' ? 'parking' : p.name === 'Go to Jail' ? 'go-jail'
+    : p.name === 'Chance' ? 'chance' : p.name === 'Community Chest' ? 'chest' : p.name.toLowerCase().includes('tax') ? 'tax'
+    : p.type === 'railroad' ? 'railroad' : p.type === 'utility' ? 'utility' : 'city';
+  const money = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(n % 1e6 ? 1 : 0)}M` : `$${Math.round(n / 1e3)}K`;
+
   const renderCell = (position: number) => {
+    const { row, col } = getGridPosition(position);
     const property = getPropertyByPosition(position);
-    if (!property) return <div key={position} className="bg-slate-900 border border-slate-800" style={{ gridRow: getGridPosition(position).row, gridColumn: getGridPosition(position).col }} />;
+    if (!property) return <div key={position} className="bg-slate-900 border border-slate-800" style={{ gridRow: row, gridColumn: col }} />;
 
     const isDiscovered = !blindPickEnabled || (Array.isArray(discoveredProperties) && discoveredProperties.includes(position));
-    const { row, col } = getGridPosition(position);
     const playersHere = getPlayersAtPosition(position);
-    const isCorner = position % 10 === 0;
-
-    if (isCorner) {
-      // Jail corner — special two-zone layout
-      if (position === 10) {
-        const jailedHere = playersHere.filter(p => p.isInJail);
-        const visitingHere = playersHere.filter(p => !p.isInJail);
-        return (
-          <div
-            key={position}
-            className="bg-slate-900 text-slate-200 border border-slate-800 rounded-sm relative overflow-hidden cursor-pointer hover:bg-slate-800 transition-colors"
-            style={{ gridRow: row, gridColumn: col }}
-            onClick={() => onPropertyClick(property)}
-          >
-            {/* Jail zone — top 65% */}
-            <div className="absolute top-0 left-0 right-0 flex flex-col items-center justify-center" style={{ height: '65%' }}>
-              <Building className="w-3 h-3 sm:w-5 sm:h-5 text-slate-400 flex-shrink-0" />
-              <span className="text-[0.32rem] sm:text-[0.45rem] font-bold text-slate-300 uppercase mt-0.5">Jail</span>
-              {jailedHere.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-0.5 mt-0.5">
-                  {jailedHere.map((player, idx) => (
-                    <AnimatedToken key={player.id} player={player} isMoving={isMoving[player.id]} delay={idx * 100} />
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Just Visiting strip — bottom 35%, light gray shading */}
-            <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-center border-t border-slate-600/60" style={{ height: '35%', backgroundColor: 'rgba(148,163,184,0.15)' }}>
-              <span className="text-[0.28rem] sm:text-[0.38rem] text-slate-400 uppercase font-semibold leading-tight">Just Visiting</span>
-              {visitingHere.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-0.5 mt-0.5">
-                  {visitingHere.map((player, idx) => (
-                    <AnimatedToken key={player.id} player={player} isMoving={isMoving[player.id]} delay={idx * 100} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // Other corners — standard render
-      let icon = null;
-      if (position === 0) icon = <span className="text-lg sm:text-2xl font-black text-emerald-500">GO</span>;
-      if (position === 20) icon = <Landmark className="w-4 h-4 sm:w-6 sm:h-6 text-sky-500" />;
-      if (position === 30) icon = <Home className="w-4 h-4 sm:w-6 sm:h-6 text-rose-500" />;
-
-      return (
-        <div
-          key={position}
-          className="bg-slate-900 text-slate-200 border border-slate-800 flex flex-col items-center justify-center p-0.5 sm:p-1 shadow-sm rounded-sm relative overflow-hidden cursor-pointer hover:bg-slate-800 transition-colors"
-          style={{ gridRow: row, gridColumn: col }}
-          onClick={() => onPropertyClick(property)}
-        >
-          <div className="flex-shrink-0">{icon}</div>
-          <span className="text-[0.38rem] sm:text-[0.5rem] font-bold text-center mt-0.5 uppercase leading-tight break-words w-full px-0.5 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-            {isDiscovered ? property.name : '?'}
-          </span>
-          {playersHere.length > 0 && (
-            <div className="absolute inset-0 flex justify-center items-center flex-wrap gap-0.5 sm:gap-1 p-0.5 overflow-hidden z-20">
-              {playersHere.map((player, idx) => (
-                <AnimatedToken key={player.id} player={player} isMoving={isMoving[player.id]} delay={idx * 100} />
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // Property Render — use hex-based inline styles throughout
-    const hexColor = getColorHex(property.colorGroup);
-    const isHorizontal = row === 1 || row === 11;
-    const colorBarClass = property.colorGroup
-      ? (isHorizontal
-          ? `h-[25%] w-full absolute ${row === 1 ? 'bottom-0' : 'top-0'}`
-          : `w-[25%] h-full absolute ${col === 1 ? 'right-0' : 'left-0'}`)
-      : '';
-
-    let padClass = 'p-0.5';
-    if (property.colorGroup) {
-      if (row === 11) padClass = 'pt-[28%] px-0.5 pb-0.5';
-      if (row === 1) padClass = 'pb-[28%] px-0.5 pt-0.5';
-      if (col === 1) padClass = 'pr-[28%] py-0.5 pl-0.5';
-      if (col === 11) padClass = 'pl-[28%] py-0.5 pr-0.5';
-    }
-
-    const isChanceOrCC = property.name === 'Chance' || property.name === 'Community Chest';
+    const ownerPlayer = property.isOwned ? players.find(p => p.name === property.owner) : undefined;
+    // top edge stays upright (upside-down names are unreadable on a phone); sides rotate like a real board
+    const orientation = position % 10 === 0 ? 'bottom' : row === 11 ? 'bottom' : col === 1 ? 'left' : row === 1 ? 'bottom' : 'right';
+    const kind = kindOf(property);
+    const buyable = property.type === 'property' || property.type === 'railroad' || property.type === 'utility';
 
     return (
-      <Card
-        key={position}
-        className={`
-          cursor-pointer transition-all relative rounded-sm border border-slate-800 flex flex-col bg-slate-900
-          ${selectedProperty?.id === property.id ? 'ring-2 ring-inset ring-blue-500 z-10' : 'hover:bg-slate-800'}
-          ${isChanceOrCC ? 'bg-gradient-to-b from-slate-900 to-yellow-950/20' : ''}
-          no-touch-min ${property.isInactive ? 'grayscale opacity-60' : ''}
-        `}
-        style={{ gridRow: row, gridColumn: col }}
-        onClick={() => isDiscovered && onPropertyClick(property)}
-        role="button"
-        tabIndex={isDiscovered ? 0 : -1}
-        aria-label={isDiscovered ? `${property.name}${property.isOwned ? `, owned by ${property.owner}` : ''}${property.isInactive ? ', bankrupt (neutral)' : ''}${property.isMortgaged ? ', mortgaged' : ''}` : 'Undiscovered tile'}
-        onKeyDown={(e) => { if (isDiscovered && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onPropertyClick(property); } }}
-      >
-        {/* Mortgaged: diagonal hatch + M tag; bankrupt/neutral: grey + X tag (text backup so colour isn't the only cue) */}
-        {isDiscovered && property.isMortgaged && !property.isInactive && (
-          <div className="absolute inset-0 z-[12] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,0.55) 3px 5px)' }}>
-            <span className="absolute bottom-0 left-0 bg-rose-700 text-white font-black leading-none px-[2px] text-[0.4rem] sm:text-[0.5rem]">M</span>
+      <div key={position} className="relative min-w-0 min-h-0" style={{ gridRow: row, gridColumn: col }}>
+        <BoardTile
+          name={property.name} code={codeOf(property.name)} kind={kind}
+          price={buyable ? money(property.currentValue) : undefined}
+          groupColor={getColorHex(property.colorGroup) ?? undefined}
+          owner={ownerPlayer ? { id: ownerPlayer.id, name: ownerPlayer.name, color: ownerPlayer.color, token: ownerPlayer.pieceIcon } : undefined}
+          houses={property.houses} hotel={property.hasHotel} mortgaged={property.isMortgaged} neutral={property.isInactive}
+          auction={property.isInAuction}
+          monopoly={property.type === 'property' && property.isOwned && !!property.owner && ownsFullGroup(properties, property, property.owner)}
+          hidden={!isDiscovered} orientation={orientation as 'bottom' | 'left' | 'top' | 'right'} size="map"
+          selected={selectedProperty?.id === property.id}
+          onSelect={isDiscovered ? () => onPropertyClick(property) : undefined}
+        />
+        {playersHere.length > 0 && (
+          <div className="absolute inset-0 flex justify-center items-center flex-wrap gap-0.5 p-0.5 z-20 pointer-events-none">
+            {playersHere.map((player, idx) => (
+              <AnimatedToken key={player.id} player={player} isMoving={isMoving[player.id]} delay={idx * 100} />
+            ))}
           </div>
         )}
-        {isDiscovered && property.isInactive && (
-          <span className="absolute bottom-0 left-0 z-[12] bg-slate-600 text-white font-black leading-none px-[2px] text-[0.4rem] sm:text-[0.5rem] pointer-events-none">X</span>
-        )}
-
-        {/* Colour bar — always use inline style so custom hex colours work */}
-        {isDiscovered && hexColor && (
-          <div className={`${colorBarClass} z-0`} style={{ backgroundColor: hexColor }} />
-        )}
-
-        {/* Chance / Community Chest ? icon */}
-        {isDiscovered && isChanceOrCC && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[5]">
-            <span className="font-black text-yellow-400/70 select-none" style={{ fontSize: 'clamp(0.5rem, 1.5vw, 1rem)', lineHeight: 1 }}>?</span>
-          </div>
-        )}
-
-        <div className={`flex flex-col justify-between h-full w-full z-10 relative ${isDiscovered ? padClass : 'p-0.5'}`}>
-          {/* Property name */}
-          <div className="flex items-center justify-center w-full overflow-hidden flex-1 min-h-0">
-            <p className="text-[0.34rem] sm:text-[0.48rem] font-bold text-slate-200 leading-[1.15] text-center uppercase break-words w-full line-clamp-3 overflow-hidden">
-              {isDiscovered ? property.name : '???'}
-            </p>
-          </div>
-
-          {isDiscovered && (
-            <div className="flex flex-col items-center">
-              {property.type === 'property' && (property.houses > 0 || property.hasHotel) && (
-                <div className="flex gap-px mb-0.5">
-                  {property.hasHotel ? (
-                    <Hotel className="w-2 h-2 sm:w-3 sm:h-3 text-red-500" />
-                  ) : (
-                    Array.from({ length: property.houses }).map((_, idx) => (
-                      <Home key={idx} className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-green-500" />
-                    ))
-                  )}
-                </div>
-              )}
-              {!isChanceOrCC && (
-                <span className="text-[0.38rem] sm:text-[0.52rem] font-bold text-slate-400 tracking-tight">
-                  ${(property.baseValue / 1000)}K
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Player Tokens — z-20 so they sit above cell content but below fixed overlays */}
-          {playersHere.length > 0 && (
-            <div className="absolute inset-0 flex justify-center items-center flex-wrap gap-0.5 pointer-events-none p-0.5 z-20">
-              {playersHere.map((player, idx) => (
-                <AnimatedToken key={player.id} player={player} isMoving={isMoving[player.id]} delay={idx * 100} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Ownership / auction dot — direct child of Card (relative) so padding changes don't affect its size */}
-        {isDiscovered && (property.isOwned || property.isInAuction) && (
-          <div className="absolute top-0.5 right-0.5 z-[15] flex gap-0.5 pointer-events-none">
-            {property.isOwned && (
-              <div
-                className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-white/70 shadow-md flex-shrink-0"
-                style={{ backgroundColor: players.find(p => p.name === property.owner)?.color || '#999' }}
-              />
-            )}
-            {property.isInAuction && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-yellow-400 rounded-full animate-pulse flex-shrink-0" />}
-          </div>
-        )}
-      </Card>
+      </div>
     );
   };
 
   return (
-    <div className="bg-slate-800 p-2 sm:p-4 rounded-xl shadow-xl w-full">
+    <BoardFrame label="Game board">
+    <div className="p-2 sm:p-3 w-full">
       <div className="relative w-full aspect-square max-w-4xl mx-auto grid grid-cols-11 grid-rows-11 gap-[1px] sm:gap-[2px] bg-slate-950 border-2 sm:border-4 border-slate-900 rounded-sm p-[1px] sm:p-[2px]">
         {properties.length > 0 ? (
           Array.from({ length: 40 }).map((_, i) => renderCell(i))
@@ -423,6 +287,7 @@ const MonopolyBoardLayout: React.FC<MonopolyBoardLayoutProps> = ({
         </div>
       </div>
     </div>
+    </BoardFrame>
   );
 };
 

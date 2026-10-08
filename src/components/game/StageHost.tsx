@@ -6,6 +6,7 @@ import {
 } from '@/ui-kit';
 import { mortgagePayout } from '@/gameEngine/core';
 import { PropertyFace, RevealCard, JailCard } from '@/ui-kit/cards';
+import { AuctionHall } from '@/ui-kit/polish';
 import { cardProps, type CardCtx } from './cardAdapters';
 import type { GameState, PendingCard, Player, Property } from '@/types/game';
 
@@ -149,20 +150,33 @@ const StageHost: React.FC<StageHostProps> = ({
           ) : <p className="mma-muted">A late bid extends the clock to at least 15 seconds.</p>
         }
       >
-        {property && <div className="flex flex-col items-center gap-2">
-          <div className="sm:[zoom:1.2]"><PropertyFace {...cardProps(cardCtx, property, 'hand')} /></div>
-          <details className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-[32px] flex items-center">Full title deed &amp; rent table</summary>
-            <div className="mt-2 flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'full')} /></div>
-          </details>
-        </div>}
-        <AuctionStatus
-          propertyName={property?.name ?? 'Property'} currentBid={auction.currentBid} highestBidder={auction.highestBidder}
-          you={me.name} secondsLeft={secondsLeft} totalSeconds={Math.max(auction.duration, secondsLeft)}
-          minIncrement={10000} quickBids={[min, min + 25000, min + 50000]} onBid={actions.placeBid}
-          balance={me.balance} isSeller={isSeller} isDraft={gameState.preAuctionPhase}
-          hasBid={auction.bids.some(b => b.player === me.name)} disabledReason={blocked}
-        />
+        {(() => {
+          const bidders = [...new Set(auction.bids.map(x => x.player))]
+            .map(n => gameState.players.find(p => p.name === n)).filter(Boolean)
+            .map(p => ({ id: p!.id, name: p!.name, color: p!.color, token: p!.pieceIcon }));
+          const hasBid = auction.bids.some(x => x.player === me.name);
+          const reason = (amount: number) => blocked || (secondsLeft <= 0 ? 'Bidding has closed.' : isSeller ? 'You are the seller.' : auction.highestBidder === me.name ? 'You already lead.' : amount > me.balance ? 'Not enough cash.' : undefined);
+          return (
+            <AuctionHall
+              card={property ? (
+                <div className="flex flex-col items-center gap-2">
+                  <PropertyFace {...cardProps(cardCtx, property, 'hand')} />
+                  <details className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-[32px] flex items-center">Full title deed &amp; rent table</summary>
+                    <div className="mt-2 flex justify-center"><PropertyFace {...cardProps(cardCtx, property, 'full')} /></div>
+                  </details>
+                </div>
+              ) : null}
+              currentBid={auction.currentBid} leader={auction.highestBidder ?? undefined}
+              seconds={secondsLeft} totalSeconds={Math.max(auction.duration, secondsLeft)} bidders={bidders}
+              outbid={hasBid && !!auction.highestBidder && auction.highestBidder !== me.name}
+              bids={[min, min + 25000, min + 50000].map((amount, i) => ({
+                id: `bid-${amount}`, label: `Bid ${formatCurrency(amount, false)}`, primary: i === 0,
+                onClick: () => actions.placeBid(amount), disabledReason: reason(amount)
+              }))}
+            />
+          );
+        })()}
       </ActionStage>
     );
   } else if (pending && isMyTurn) {

@@ -183,6 +183,8 @@ interface PlayerPanelProps {
   cardsSlot?: React.ReactNode;
   /** Rank by real net worth, computed once by the caller so every panel agrees */
   rank?: number;
+  /** The polish PlayerCard is rendered above, so skip the built-in header + cash/net-worth tiles */
+  compactHeader?: boolean;
 }
 
 const PlayerPanel: React.FC<PlayerPanelProps> = ({
@@ -195,6 +197,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
   workersEnabled = false,
   cardsSlot,
   rank: rankProp,
+  compactHeader = false,
 }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [colorOrder, setColorOrder] = useState<string[]>(DEFAULT_COLOR_ORDER);
@@ -253,6 +256,7 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
 
   return (
     <Card className="bg-slate-900 border-slate-700">
+      {!compactHeader && (
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-white text-sm">
           <div className="flex items-center gap-2">
@@ -265,8 +269,10 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
           <span className="text-xs text-slate-400 font-normal">Rank #{rank}</span>
         </CardTitle>
       </CardHeader>
+      )}
 
       <CardContent className="space-y-3 pt-0">
+        {!compactHeader && (<>
         {/* Finances */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-800 rounded-lg p-2">
@@ -278,6 +284,8 @@ const PlayerPanel: React.FC<PlayerPanelProps> = ({
             <div className="text-sm font-bold text-white">${netWorth.toLocaleString('en-US')}</div>
           </div>
         </div>
+
+        </>)}
 
         {/* Properties header */}
         <div>

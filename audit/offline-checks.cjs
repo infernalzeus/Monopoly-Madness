@@ -232,5 +232,13 @@ test('rematch resets the game for the host only', () => {
   assert.equal(slots[0].players[1].balance, s.settings.startingBalance); assert.equal(slots[0].properties[1].isOwned, false);
 });
 
+test('bankrupt current player: completed grace state, then advanceTurn hands over to an active player', () => {
+  const s = fixture(3); s.players[0].balance = 1; s.currentPlayer = 'player-1'; s.turnState = 'waiting_for_action';
+  const n = core.applyPayment(s, 'player-1', 'Alice', 50, 'Rent');
+  assert.equal(n.players[0].isActive, false); assert.equal(n.turnState, 'completed'); assert.equal(n.currentPlayer, 'player-1');
+  const next = core.advanceTurn(n); assert.notEqual(next.currentPlayer, 'player-1');
+  assert.ok(next.players.find(p => p.id === next.currentPlayer).isActive);
+});
+
 console.log(`RESULT ${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;
