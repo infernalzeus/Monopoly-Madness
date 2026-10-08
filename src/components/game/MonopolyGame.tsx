@@ -10,9 +10,6 @@ import RulesPanel from './RulesPanel';
 import GameConsole from './GameConsole';
 import LobbySystem from './LobbySystem';
 import TransactionNotification from './TransactionNotification';
-import TradingSystem from './TradingSystem';
-import RentPaymentDialog from './RentPaymentDialog';
-import GameLog from './GameLog';
 import TeamPanel from './TeamPanel';
 import { db, authReady, currentUid } from '@/lib/firebase';
 import { setClockOffset } from '@/lib/clock';
@@ -36,7 +33,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 
 /** Positions a kit sheet as a right-hand dock on desktop; on phones the kit's own bottom sheet takes over. */
 const SheetDock: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -62,8 +58,6 @@ const MonopolyGame: React.FC = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isTradingOpen, setIsTradingOpen] = useState(false);
   const [isWorkerPanelOpen, setIsWorkerPanelOpen] = useState(false);
-  const [workerPickColor, setWorkerPickColor] = useState('#FFE5B4');
-  const [workerPickPropertyId, setWorkerPickPropertyId] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [selectedSpecialProperty, setSelectedSpecialProperty] = useState<Property | null>(null);
   const [offerDismissed, setOfferDismissed] = useState(false);
@@ -167,7 +161,13 @@ const MonopolyGame: React.FC = () => {
           }
         }, 900);
       } else {
-        timer = setTimeout(() => rollDiceForBotRef.current(), 1200);
+        timer = setTimeout(() => {
+          // Bot Noob builds a house when it owns a full colour group and has plenty of cash
+          const target = gameState.properties.find(p => p.owner === activeCp.name && p.type === 'property' && canBuildHouse(p, activeCp.name)
+            && activeCp.balance >= (p.houseCost || 0) * (p.houses + 1) * 3);
+          if (target) buildHouse(target.id);
+          rollDiceForBotRef.current();
+        }, 1200);
       }
     } else if (gameState.turnState === 'waiting_for_action') {
       if (gameState.pendingCard) {

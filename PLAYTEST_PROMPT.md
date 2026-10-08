@@ -7,7 +7,7 @@ was ever played. This prompt makes it **play** the game with several simulated p
 ---
 
 Goal: find bugs by *playing*, not reading. Build a local multi-client playtest harness and run it. Read `arch.md`
-(v1.1.7 section), `AUDIT_REPORT.md` and `audit/offline-checks.cjs` first — don't re-report fixed items.
+(v1.1.7 – v1.1.12 sections), `AUDIT_REPORT.md` and `audit/offline-checks.cjs` first — don't re-report fixed items.
 
 ## Hard rules
 - **Never** use the real Firebase project or `.env.local`. Use the Firestore + Auth **emulators** only; point the app at
@@ -17,6 +17,16 @@ Goal: find bugs by *playing*, not reading. Build a local multi-client playtest h
   say so and fall back to Task B only.
 - No pushes, no commits; leave changes uncommitted. Don't edit game rules to make tests pass — report instead.
 - Report failures as failures, with the exact command and output.
+
+
+## Regressions that already shipped once — your harness MUST catch these
+These got through because nobody clicked through the real UI. Drive the real screens (Playwright), don't just call hooks:
+1. **Roll Dice missing/inert in a single-player vs-bot game** (v1.1.11): the dice display was replaced by an empty action stage; separately `handleDiceRoll` read a stale `gamePhase` so every click logged "Dice roll rejected". Assert: at the start of every human turn a *visible, enabled* Roll Dice button exists and clicking it changes `lastDiceRoll` in Firestore within 3 s.
+2. **Page scroll locked while a pop-up is open** (rent, card, purchase): assert `document.scrollingElement.scrollTop` can change (wheel/touch) while an action stage is open, on desktop and at 390 px.
+3. **Blank page when `VITE_FIREBASE_*` missing** — build once without env vars and assert the "isn't configured" screen renders instead of a white page.
+4. Turn never stalls: for each scenario assert that within 90 s of any human turn starting, either an action has occurred or the turn timer advanced the turn.
+5. Action stage priority: at most one stage visible; never a stage for someone else's decision; Pass → bank auction when auctions are on.
+6. Phone sheets (portfolio, teams, workers, trade, log) open, are scrollable, close with Escape / the close button, and focus returns to the opener.
 
 ## Task A — real multi-client playthroughs (Playwright)
 Install Playwright as a **dev** dependency only if needed. Drive 2–4 browser contexts (each its own anonymous uid)

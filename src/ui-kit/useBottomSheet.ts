@@ -24,10 +24,9 @@ export function useBottomSheet({ open = true, onDismiss, modal = true }: BottomS
       else if (!event.shiftKey && (index === -1 || index === items.length - 1)) { event.preventDefault(); first(); }
     };
     const onFocus = (event: FocusEvent) => { if (modal && !node.contains(event.target as Node)) first(); };
-    const oldOverflow = document.body.style.overflow;
-    if (modal) document.body.style.overflow = 'hidden';
+    // No body scroll lock: players must still be able to scroll the page (board, portfolio) behind a pending decision.
     document.addEventListener('keydown', onKey); document.addEventListener('focusin', onFocus);
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('focusin', onFocus); if (modal) { document.body.style.overflow = oldOverflow; if (previous?.isConnected) previous.focus({ preventScroll: true }); } };
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('focusin', onFocus); if (modal) { if (previous?.isConnected) previous.focus({ preventScroll: true }); } };
   }, [open, modal]);
   return { ref, isMobile };
 }

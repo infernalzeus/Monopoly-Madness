@@ -1,6 +1,6 @@
 # 🎲 Monopoly Madness Auction - Application Architecture & Developer Manual
 
-> **Current Version: `v1.1.11`**  
+> **Current Version: `v1.1.12`**  
 > Version is displayed on the lobby start screen (`LobbySystem.tsx` header) and used as the prefix for all git commit summaries.  
 > Format: `v<major>.<minor>.<patch>.<build>` — increment build on each fix, patch on each feature set, minor on design overhauls.
 
@@ -574,6 +574,12 @@ In `movePlayer()` (`core.ts`), when `passedGo && settings.workersEnabled`:
 | **Achievements system** | New `src/lib/achievements.ts` defines 10 milestones (First Step, Landlord, Property Mogul, Millionaire, Cash King, Monopolist, Developer, Hotel Magnate, Deal Maker, Survivor). A `useEffect` in `MonopolyGame.tsx` checks conditions on each meaningful state change and persists unlocked IDs to `localStorage` keyed by player name. Unlocks trigger toast notifications. |
 | **Achievements UI** | Trophy button `🏆 X/10` added to the game header. Clicking opens a dialog listing all achievements with lock/unlock visual states (greyed-out + grayscale when locked). |
 | **Google Play note** | Google Play Games SDK is Android-only; web-based achievement persistence uses `localStorage` in v1.1.3. Firebase Auth + Firestore cloud sync can be layered in a future version using `mm_ach_{playerName}` as the key schema. |
+
+---
+
+## 🔧 v1.1.12 — live-test fixes + cleanup
+
+**Live-test regressions fixed (v1.1.11):** Roll Dice was missing (empty `StageHost` element replaced the dice display — `MonopolyBoardLayout` now always renders `CentralDisplay` and layers `children` over it) and inert (`handleDiceRoll` closed over a stale `gamePhase`; added to deps) · **modal scroll lock removed** (`useBottomSheet` no longer sets `body{overflow:hidden}`; pending decisions no longer freeze the page) · "You's Turn" → "Your Turn". **Small items:** Bot Noob builds a house before rolling when it owns a full group and has 3× the cost in cash · hotel sell-back respects the 32-house supply (`canSellBuildingOn(..., supplyLimits)`, also in auto-liquidation) · drafts already work for the bot (bids run in the 'auction' phase). **Deleted unused panels:** `TradingSystem`, `GameLog`, `RentPaymentDialog`, `GameOverview`, `GameBoard`, `DiceRoller`, `Gameboard/`. Prompts: `UI_CARDS_PROMPT.md` (Runeterra-style property/event cards), `PLAYTEST_PROMPT.md` refreshed with the regressions above.
 
 ---
 

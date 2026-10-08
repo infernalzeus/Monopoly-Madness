@@ -399,8 +399,10 @@ export const canBuildHotelOn = (properties: Property[], property: Property, owne
 };
 
 // Even-sell: a property may only be lowered when it is at the highest level in its group.
-export const canSellBuildingOn = (properties: Property[], property: Property, ownerName: string): boolean => {
+export const canSellBuildingOn = (properties: Property[], property: Property, ownerName: string, supplyLimits = false): boolean => {
   if (property.type !== 'property' || property.owner !== ownerName || buildLevel(property) <= 0) return false;
+  // Selling a hotel returns 4 houses to the supply — only possible if the supply has them (classic rule)
+  if (supplyLimits && property.hasHotel && housesInPlay(properties) + 4 > HOUSE_SUPPLY) return false;
   return buildLevel(property) >= Math.max(...colorGroupOf(properties, property).map(buildLevel));
 };
 
@@ -488,7 +490,7 @@ export const autoLiquidate = (state: GameState, playerId: string, needed: number
   let raised = 0;
   for (let guard = 0; guard < 300 && raised < needed; guard++) {
     const cand = s.properties
-      .filter(p => p.owner === me.name && canSellBuildingOn(s.properties, p, me.name))
+      .filter(p => p.owner === me.name && canSellBuildingOn(s.properties, p, me.name, !!s.settings.supplyLimits))
       .sort((a, b) => buildLevel(b) - buildLevel(a))[0];
     if (!cand) break;
     raised += cand.hasHotel ? Math.round((cand.hotelCost || 0) * 0.5) : Math.round((cand.houseCost || 0) * cand.houses * 0.5);

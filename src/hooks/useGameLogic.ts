@@ -746,7 +746,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
     setGameState(withActor((prev, actor) => {
       const property = prev.properties.find(p => p.id === propertyId);
       if (!property || property.hasHotel || property.houses <= 0) return prev;
-      if (!canSellBuildingOn(prev.properties, property, actor.name)) return prev;
+      if (!canSellBuildingOn(prev.properties, property, actor.name, !!prev.settings.supplyLimits)) return prev;
       // Refund half of what that house cost (cost scales with its number)
       const refund = Math.round((property.houseCost || 0) * property.houses * 0.5);
       const next = {
@@ -776,7 +776,7 @@ export const useGameLogic = (roomId?: string, localPlayerId?: string) => {
   const sellHotel = useCallback((propertyId: string) => {
     setGameState(withActor((prev, actor) => {
       const property = prev.properties.find(p => p.id === propertyId);
-      if (!property || !property.hasHotel || !canSellBuildingOn(prev.properties, property, actor.name)) return prev;
+      if (!property || !property.hasHotel || !canSellBuildingOn(prev.properties, property, actor.name, !!prev.settings.supplyLimits)) return prev;
       const refund = Math.round((property.hotelCost || 0) * 0.5);
       const next = {
         ...prev,
